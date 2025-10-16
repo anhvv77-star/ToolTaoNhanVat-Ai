@@ -35,11 +35,28 @@ const handleApiError = (error: any): never => {
   if (error?.message?.includes('API key not valid')) {
     throw new Error("API Key không hợp lệ. Vui lòng kiểm tra lại.");
   }
+  if (error?.message?.includes('RESOURCE_EXHAUSTED')) {
+    throw new Error("Đã hết hạn ngạch hoặc bạn chưa bật thanh toán cho dự án Google Cloud của mình. Vui lòng kiểm tra lại.");
+  }
   if (error?.message) {
     throw new Error(error.message);
   }
   throw new Error("Không thể thực hiện yêu cầu do lỗi không xác định. Vui lòng thử lại.");
 }
+
+export const validateApiKey = async (apiKey: string): Promise<boolean> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    // Make a simple, low-cost call to validate the key and configuration
+    await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: 'hello',
+    });
+    return true;
+  } catch (error: any) {
+    handleApiError(error);
+  }
+};
 
 export const generateImageFromPrompt = async (apiKey: string, prompt: string): Promise<string> => {
   try {
@@ -93,7 +110,8 @@ export const generateSceneWithCharacter = async (
     });
 
     return processImageResponse(response);
-  } catch (error: any) {
+  } catch (error: any)
+{
     handleApiError(error);
   }
 };
