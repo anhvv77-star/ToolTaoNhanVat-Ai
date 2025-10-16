@@ -1,18 +1,29 @@
+
 import React from 'react';
-import type { Character } from '../types';
-import { PlusCircleIcon, UsersIcon, CheckCircleIcon, DownloadIcon, EditIcon, TrashIcon } from './icons';
+import type { Character, Scene } from '../types';
+import { PlusCircleIcon, UsersIcon, CheckCircleIcon, DownloadIcon, TrashIcon } from './icons';
 
 interface CharacterLibraryProps {
   characters: Character[];
+  savedScenes: Scene[];
   selectedCharacterIds: string[];
   onSelectCharacter: (id: string) => void;
   onCreateCharacter: () => void;
   onGenerateScene: () => void;
-  onEditCharacter: (id: string) => void;
   onDeleteCharacter: (id: string) => void;
+  onDeleteScene: (id: string) => void;
 }
 
-const CharacterLibrary: React.FC<CharacterLibraryProps> = ({ characters, selectedCharacterIds, onSelectCharacter, onCreateCharacter, onGenerateScene, onEditCharacter, onDeleteCharacter }) => {
+const CharacterLibrary: React.FC<CharacterLibraryProps> = ({ 
+  characters, 
+  savedScenes,
+  selectedCharacterIds, 
+  onSelectCharacter, 
+  onCreateCharacter, 
+  onGenerateScene, 
+  onDeleteCharacter,
+  onDeleteScene
+}) => {
   const handleDownloadCharacter = (e: React.MouseEvent, char: Character) => {
     e.stopPropagation(); // Ngăn chặn sự kiện click của thẻ cha (chọn nhân vật)
     const link = document.createElement('a');
@@ -23,19 +34,17 @@ const CharacterLibrary: React.FC<CharacterLibraryProps> = ({ characters, selecte
     document.body.removeChild(link);
   };
 
-  const handleDeleteClick = (e: React.MouseEvent, char: Character) => {
-    e.stopPropagation();
-    if (window.confirm(`Bạn có chắc chắn muốn xóa nhân vật "${char.name}" không?`)) {
-        onDeleteCharacter(char.id);
-    }
+  const handleDeleteCharacter = (e: React.MouseEvent, charId: string) => {
+    e.stopPropagation(); // Prevent selecting the character
+    onDeleteCharacter(charId);
   };
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
         <div>
-          <h1 className="text-4xl font-bold text-white">Thư Viện Nhân Vật</h1>
-          <p className="text-gray-400 mt-1">Quản lý và lựa chọn nhân vật cho các dự án của bạn.</p>
+          <h1 className="text-4xl font-bold text-white">Thư Viện</h1>
+          <p className="text-gray-400 mt-1">Quản lý nhân vật và các bối cảnh đã lưu của bạn.</p>
         </div>
         <button 
           onClick={onGenerateScene} 
@@ -47,6 +56,7 @@ const CharacterLibrary: React.FC<CharacterLibraryProps> = ({ characters, selecte
         </button>
       </div>
 
+      <h2 className="text-2xl font-semibold text-cyan-400 mb-4">Nhân Vật</h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
         <div 
           onClick={onCreateCharacter}
@@ -61,33 +71,22 @@ const CharacterLibrary: React.FC<CharacterLibraryProps> = ({ characters, selecte
             onClick={() => onSelectCharacter(char.id)}
             className={`relative group cursor-pointer rounded-lg overflow-hidden transition-all duration-300 transform hover:-translate-y-1 ${selectedCharacterIds.includes(char.id) ? 'ring-4 ring-cyan-500' : 'ring-2 ring-transparent'}`}
           >
-            <div className="absolute top-2 left-2 z-10 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <div className="absolute top-2 left-2 z-10 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
-                onClick={(e) => handleDownloadCharacter(e, char)}
-                className="p-1.5 bg-black/50 rounded-full text-white hover:bg-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                aria-label={`Tải xuống ${char.name}`}
-                title={`Tải xuống ${char.name}`}
+                  onClick={(e) => handleDownloadCharacter(e, char)}
+                  className="p-1.5 bg-black/50 rounded-full text-white hover:bg-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  aria-label={`Tải xuống ${char.name}`}
+                  title={`Tải xuống ${char.name}`}
                 >
-                <DownloadIcon className="w-5 h-5" />
+                  <DownloadIcon className="w-5 h-5" />
                 </button>
                 <button
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onEditCharacter(char.id);
-                }}
-                className="p-1.5 bg-black/50 rounded-full text-white hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                aria-label={`Chỉnh sửa ${char.name}`}
-                title={`Chỉnh sửa ${char.name}`}
+                  onClick={(e) => handleDeleteCharacter(e, char.id)}
+                  className="p-1.5 bg-black/50 rounded-full text-white hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  aria-label={`Xóa ${char.name}`}
+                  title={`Xóa ${char.name}`}
                 >
-                <EditIcon className="w-5 h-5" />
-                </button>
-                 <button
-                onClick={(e) => handleDeleteClick(e, char)}
-                className="p-1.5 bg-black/50 rounded-full text-white hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
-                aria-label={`Xóa ${char.name}`}
-                title={`Xóa ${char.name}`}
-                >
-                <TrashIcon className="w-5 h-5" />
+                  <TrashIcon className="w-5 h-5" />
                 </button>
             </div>
             <img src={char.imageUrl} alt={char.name} className="w-full h-full object-cover aspect-[3/4]" />
@@ -107,10 +106,41 @@ const CharacterLibrary: React.FC<CharacterLibraryProps> = ({ characters, selecte
        {characters.length === 0 && (
             <div className="col-span-full text-center py-16 bg-gray-800/50 rounded-lg">
                 <UsersIcon className="mx-auto h-12 w-12 text-gray-500" />
-                <h3 className="mt-2 text-lg font-medium text-white">Thư viện trống</h3>
+                <h3 className="mt-2 text-lg font-medium text-white">Chưa có nhân vật nào</h3>
                 <p className="mt-1 text-sm text-gray-400">Hãy bắt đầu bằng cách tạo nhân vật đầu tiên của bạn.</p>
             </div>
         )}
+      
+      {savedScenes.length > 0 && (
+        <>
+          <h2 className="text-2xl font-semibold text-cyan-400 mt-12 mb-4">Bối Cảnh Đã Lưu</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            {savedScenes.map((scene) => (
+              <div 
+                key={scene.id} 
+                className="relative group rounded-lg overflow-hidden transition-all duration-300 transform hover:-translate-y-1"
+              >
+                  <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => onDeleteScene(scene.id)}
+                      className="p-1.5 bg-black/50 rounded-full text-white hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                      aria-label="Xóa cảnh"
+                      title="Xóa cảnh"
+                    >
+                      <TrashIcon className="w-5 h-5" />
+                    </button>
+                  </div>
+                <img src={scene.imageUrl} alt={scene.prompt} className="w-full h-full object-cover aspect-video" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+                <div className="absolute bottom-0 left-0 p-3 w-full">
+                  <p className="text-xs text-gray-300 truncate" title={scene.prompt}>{scene.prompt || 'Cảnh đã lưu'}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
     </div>
   );
 };

@@ -10,6 +10,13 @@ export interface Character {
   expression: string;
 }
 
+export interface Scene {
+  id: string;
+  imageUrl: string;
+  prompt: string;
+  characterIds: string[];
+}
+
 export interface AspectRatio {
   label: string;
   value: string;
