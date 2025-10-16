@@ -1,0 +1,5 @@
+{
+  "name": "Trình Tạo Nhân Vật AI",
+  "description": "Một công cụ mạnh mẽ để tạo nhân vật và bối cảnh bằng AI. Người dùng có thể tải lên ảnh có sẵn hoặc tạo nhân vật hoàn toàn mới từ mô tả, sau đó đưa họ vào các bối cảnh đa dạng với tỷ lệ khung hình tùy chỉnh.",
+  "requestFramePermissions": []
+}
