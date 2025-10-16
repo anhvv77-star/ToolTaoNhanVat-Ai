@@ -1,18 +1,53 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import type { AppView, Character, AspectRatio } from './types';
 import CharacterLibrary from './components/CharacterLibrary';
 import CharacterCreator from './components/CharacterCreator';
 import SceneGenerator from './components/SceneGenerator';
 import ResultViewer from './components/ResultViewer';
+import ApiKeyModal from './components/ApiKeyModal'; // Import new component
 import { ASPECT_RATIOS } from './constants';
-import { generateSceneWithCharacter } from './services/geminiService';
+import { generateSceneWithCharacter, initializeGemini } from './services/geminiService'; // Import initializer
 import { base64ToImageData } from './utils/fileUtils';
 
+// A simple component to show a global error, e.g., if the API key is invalid.
+const GlobalError: React.FC<{ message: string; onClear: () => void }> = ({ message, onClear }) => (
+    <div className="fixed top-5 right-5 bg-red-500 text-white p-4 rounded-lg shadow-lg z-50 flex items-center gap-4">
+        <span>{message}</span>
+        <button onClick={onClear} className="font-bold text-lg">&times;</button>
+    </div>
+);
+
+
 const App: React.FC = () => {
+  const [apiKey, setApiKey] = useState<string | null>(() => localStorage.getItem('gemini_api_key'));
+  const [globalError, setGlobalError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (apiKey) {
+      try {
+        initializeGemini(apiKey);
+      } catch (error: any) {
+        console.error("Failed to initialize Gemini:", error);
+        setGlobalError("Không thể khởi tạo dịch vụ AI. Vui lòng kiểm tra API Key.");
+        localStorage.removeItem('gemini_api_key');
+        setApiKey(null);
+      }
+    }
+  }, [apiKey]);
+
+  const handleSaveApiKey = (key: string) => {
+    if (key.trim()) {
+      localStorage.setItem('gemini_api_key', key);
+      setApiKey(key);
+      setGlobalError(null); // Clear error on new key
+    }
+  };
+
   const [view, setView] = useState<AppView>('library');
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedCharacterIds, setSelectedCharacterIds] = useState<string[]>([]);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [characterToEdit, setCharacterToEdit] = useState<Character | null>(null);
 
   // State for SceneGenerator
   const [scenePrompt, setScenePrompt] = useState('');
@@ -21,9 +56,27 @@ const App: React.FC = () => {
   const [sceneError, setSceneError] = useState<string | null>(null);
 
   const handleSaveCharacter = useCallback((character: Character) => {
-    setCharacters(prev => [...prev, character]);
+    const existingIndex = characters.findIndex(c => c.id === character.id);
+    if (existingIndex !== -1) {
+      // Update existing character
+      const updatedCharacters = [...characters];
+      updatedCharacters[existingIndex] = character;
+      setCharacters(updatedCharacters);
+    } else {
+      // Add new character
+      setCharacters(prev => [...prev, character]);
+    }
+    setCharacterToEdit(null); // Reset editing state
     setView('library');
-  }, []);
+  }, [characters]);
+
+  const handleStartEditCharacter = useCallback((id: string) => {
+    const charToEdit = characters.find(c => c.id === id);
+    if (charToEdit) {
+        setCharacterToEdit(charToEdit);
+        setView('createCharacter');
+    }
+  }, [characters]);
   
   const handleSelectCharacter = useCallback((id: string) => {
     setSelectedCharacterIds(prevIds =>
@@ -58,7 +111,13 @@ const App: React.FC = () => {
         setGeneratedImage(resultImage);
         setView('results');
     } catch (err: any) {
-        setSceneError(err.message || 'Đã xảy ra lỗi khi tạo bối cảnh.');
+        if (err.message.includes('API key not valid')) {
+             setGlobalError('API Key không hợp lệ. Vui lòng nhập lại.');
+             localStorage.removeItem('gemini_api_key');
+             setApiKey(null);
+        } else {
+            setSceneError(err.message || 'Đã xảy ra lỗi khi tạo bối cảnh.');
+        }
     } finally {
         setIsLoading(false);
     }
@@ -76,7 +135,14 @@ const App: React.FC = () => {
   const renderView = () => {
     switch (view) {
       case 'createCharacter':
-        return <CharacterCreator onSave={handleSaveCharacter} onCancel={() => setView('library')} />;
+        return <CharacterCreator 
+            onSave={handleSaveCharacter} 
+            onCancel={() => {
+                setCharacterToEdit(null);
+                setView('library');
+            }} 
+            characterToEdit={characterToEdit}
+        />;
       case 'createScene':
         if (selectedCharacters.length === 0) {
           setView('library');
@@ -113,6 +179,7 @@ const App: React.FC = () => {
               setSceneError(null); // Clear previous errors when starting a new scene generation
               setView('createScene')
             }}
+            onEditCharacter={handleStartEditCharacter}
           />
         );
     }
@@ -120,7 +187,12 @@ const App: React.FC = () => {
 
   return (
     <main className="min-h-screen bg-gray-900 text-gray-100">
-      {renderView()}
+      {globalError && <GlobalError message={globalError} onClear={() => setGlobalError(null)} />}
+      {!apiKey ? (
+          <ApiKeyModal onSave={handleSaveApiKey} />
+      ) : (
+          renderView()
+      )}
     </main>
   );
 };

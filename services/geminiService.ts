@@ -1,12 +1,22 @@
 import { GoogleGenAI, Modality, GenerateContentResponse } from "@google/genai";
 
-const API_KEY = process.env.API_KEY;
+let ai: GoogleGenAI | null = null;
 
-if (!API_KEY) {
-  console.error("API_KEY is not set in environment variables.");
+export const initializeGemini = (apiKey: string) => {
+    if (!apiKey) {
+        throw new Error("API Key is required to initialize Gemini service.");
+    }
+    ai = new GoogleGenAI({ apiKey });
+};
+
+const getAi = (): GoogleGenAI => {
+    if (!ai) {
+        // This is a developer error, the UI should prevent calls before initialization
+        throw new Error("Gemini service has not been initialized. Call initializeGemini first.");
+    }
+    return ai;
 }
 
-const ai = new GoogleGenAI({ apiKey: API_KEY! });
 const model = 'gemini-2.5-flash-image';
 
 const processImageResponse = (response: GenerateContentResponse): string => {
@@ -41,7 +51,8 @@ const processImageResponse = (response: GenerateContentResponse): string => {
 
 export const generateImageFromPrompt = async (prompt: string): Promise<string> => {
   try {
-    const response = await ai.models.generateContent({
+    const genAI = getAi();
+    const response = await genAI.models.generateContent({
       model: model,
       contents: {
         parts: [{ text: prompt }],
@@ -69,6 +80,7 @@ export const generateSceneWithCharacter = async (
   scenePrompt: string
 ): Promise<string> => {
   try {
+    const genAI = getAi();
     const imageParts = characterImages.map(image => ({
         inlineData: {
             data: image.data,
@@ -76,7 +88,7 @@ export const generateSceneWithCharacter = async (
         },
     }));
 
-    const response = await ai.models.generateContent({
+    const response = await genAI.models.generateContent({
       model: model,
       contents: {
         parts: [

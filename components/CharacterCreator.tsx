@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Character } from '../types';
 import { fileToBase64 } from '../utils/fileUtils';
 import { generateImageFromPrompt } from '../services/geminiService';
@@ -8,9 +8,10 @@ import { UploadCloudIcon, WandSparklesIcon, ChevronLeftIcon } from './icons';
 interface CharacterCreatorProps {
   onSave: (character: Character) => void;
   onCancel: () => void;
+  characterToEdit?: Character | null;
 }
 
-const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel }) => {
+const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel, characterToEdit }) => {
   const [mode, setMode] = useState<'upload' | 'generate'>('generate');
   
   const [name, setName] = useState('');
@@ -26,6 +27,21 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel })
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (characterToEdit) {
+      setName(characterToEdit.name);
+      setStyle(characterToEdit.style);
+      setGender(characterToEdit.gender);
+      setAge(characterToEdit.age);
+      setOutfit(characterToEdit.outfit);
+      setExpression(characterToEdit.expression);
+      setGeneratedImage(characterToEdit.imageUrl);
+      setUploadedImage(null);
+      setMode('generate'); // Default to this mode view
+    }
+  }, [characterToEdit]);
+
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -71,8 +87,8 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel })
       setError('Vui lòng tải lên hoặc tạo một hình ảnh.');
       return;
     }
-    const newCharacter: Character = {
-      id: crypto.randomUUID(),
+    
+    const characterData = {
       name,
       imageUrl,
       style,
@@ -81,7 +97,12 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel })
       outfit,
       expression,
     };
-    onSave(newCharacter);
+
+    const characterToSave: Character = characterToEdit
+      ? { ...characterToEdit, ...characterData }
+      : { id: crypto.randomUUID(), ...characterData };
+    
+    onSave(characterToSave);
   };
   
   const isSaveDisabled = isLoading || (!uploadedImage && !generatedImage) || !name.trim();
@@ -92,7 +113,7 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel })
         <button onClick={onCancel} className="p-2 rounded-full hover:bg-gray-700 mr-4">
             <ChevronLeftIcon className="w-6 h-6" />
         </button>
-        <h1 className="text-3xl font-bold text-white">Tạo Nhân Vật Mới</h1>
+        <h1 className="text-3xl font-bold text-white">{characterToEdit ? 'Chỉnh Sửa Nhân Vật' : 'Tạo Nhân Vật Mới'}</h1>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -170,7 +191,9 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel })
           {error && <p className="text-red-400 mt-4 text-sm">{error}</p>}
           <div className="mt-6 flex space-x-4">
              <button onClick={onCancel} className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-md transition-colors duration-300">Hủy</button>
-            <button onClick={handleSave} disabled={isSaveDisabled} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-4 rounded-md transition-colors duration-300 disabled:bg-gray-500 disabled:cursor-not-allowed">Lưu Nhân Vật</button>
+            <button onClick={handleSave} disabled={isSaveDisabled} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-4 rounded-md transition-colors duration-300 disabled:bg-gray-500 disabled:cursor-not-allowed">
+                {characterToEdit ? 'Lưu Thay Đổi' : 'Lưu Nhân Vật'}
+            </button>
           </div>
         </div>
       </div>

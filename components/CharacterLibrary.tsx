@@ -1,7 +1,6 @@
 import React from 'react';
 import type { Character } from '../types';
-// FIX: Import CheckCircleIcon
-import { PlusCircleIcon, UsersIcon, CheckCircleIcon, DownloadIcon } from './icons';
+import { PlusCircleIcon, UsersIcon, CheckCircleIcon, DownloadIcon, EditIcon } from './icons';
 
 interface CharacterLibraryProps {
   characters: Character[];
@@ -9,9 +8,10 @@ interface CharacterLibraryProps {
   onSelectCharacter: (id: string) => void;
   onCreateCharacter: () => void;
   onGenerateScene: () => void;
+  onEditCharacter: (id: string) => void;
 }
 
-const CharacterLibrary: React.FC<CharacterLibraryProps> = ({ characters, selectedCharacterIds, onSelectCharacter, onCreateCharacter, onGenerateScene }) => {
+const CharacterLibrary: React.FC<CharacterLibraryProps> = ({ characters, selectedCharacterIds, onSelectCharacter, onCreateCharacter, onGenerateScene, onEditCharacter }) => {
   const handleDownloadCharacter = (e: React.MouseEvent, char: Character) => {
     e.stopPropagation(); // Ngăn chặn sự kiện click của thẻ cha (chọn nhân vật)
     const link = document.createElement('a');
@@ -53,14 +53,27 @@ const CharacterLibrary: React.FC<CharacterLibraryProps> = ({ characters, selecte
             onClick={() => onSelectCharacter(char.id)}
             className={`relative group cursor-pointer rounded-lg overflow-hidden transition-all duration-300 transform hover:-translate-y-1 ${selectedCharacterIds.includes(char.id) ? 'ring-4 ring-cyan-500' : 'ring-2 ring-transparent'}`}
           >
-            <button
-              onClick={(e) => handleDownloadCharacter(e, char)}
-              className="absolute top-2 left-2 z-10 p-1.5 bg-black/50 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-              aria-label={`Tải xuống ${char.name}`}
-              title={`Tải xuống ${char.name}`}
-            >
-              <DownloadIcon className="w-5 h-5" />
-            </button>
+            <div className="absolute top-2 left-2 z-10 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <button
+                onClick={(e) => handleDownloadCharacter(e, char)}
+                className="p-1.5 bg-black/50 rounded-full text-white hover:bg-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                aria-label={`Tải xuống ${char.name}`}
+                title={`Tải xuống ${char.name}`}
+                >
+                <DownloadIcon className="w-5 h-5" />
+                </button>
+                <button
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onEditCharacter(char.id);
+                }}
+                className="p-1.5 bg-black/50 rounded-full text-white hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                aria-label={`Chỉnh sửa ${char.name}`}
+                title={`Chỉnh sửa ${char.name}`}
+                >
+                <EditIcon className="w-5 h-5" />
+                </button>
+            </div>
             <img src={char.imageUrl} alt={char.name} className="w-full h-full object-cover aspect-[3/4]" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
             <div className="absolute bottom-0 left-0 p-3 w-full">
