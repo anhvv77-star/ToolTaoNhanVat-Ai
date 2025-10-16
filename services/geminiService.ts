@@ -1,21 +1,7 @@
 import { GoogleGenAI, Modality, GenerateContentResponse } from "@google/genai";
 
-let ai: GoogleGenAI | null = null;
-
-export const initializeGemini = (apiKey: string) => {
-    if (!apiKey) {
-        throw new Error("API Key is required to initialize Gemini service.");
-    }
-    ai = new GoogleGenAI({ apiKey });
-};
-
-const getAi = (): GoogleGenAI => {
-    if (!ai) {
-        // This is a developer error, the UI should prevent calls before initialization
-        throw new Error("Gemini service has not been initialized. Call initializeGemini first.");
-    }
-    return ai;
-}
+// Initialize the client on module load using the environment variable.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const model = 'gemini-2.5-flash-image';
 
@@ -35,7 +21,23 @@ const processImageResponse = (response: GenerateContentResponse): string => {
 
   // Case 3: A candidate was returned, but the generation was stopped for a reason other than success.
   if (candidate.finishReason && candidate.finishReason !== 'STOP') {
-     throw new Error(`Quá trình tạo ảnh đã bị dừng vì lý do: ${candidate.finishReason}. Vui lòng thử một prompt khác.`);
+     let userMessage;
+     switch(candidate.finishReason) {
+        case 'NO_IMAGE':
+        case 'SAFETY':
+            userMessage = "AI không thể tạo hình ảnh cho yêu cầu này do chính sách an toàn. Vui lòng điều chỉnh mô tả của bạn và thử lại.";
+            break;
+        case 'RECITATION':
+            userMessage = "Yêu cầu của bạn có thể chứa nội dung có bản quyền. Vui lòng điều chỉnh mô tả và thử lại.";
+            break;
+        case 'OTHER':
+            userMessage = "Đã xảy ra lỗi không xác định trong quá trình tạo ảnh. Vui lòng thử lại sau.";
+            break;
+        default:
+            userMessage = `Quá trình tạo ảnh đã bị dừng vì lý do: ${candidate.finishReason}. Vui lòng thử một prompt khác.`;
+            break;
+     }
+     throw new Error(userMessage);
   }
 
   // Case 4: Candidate finished successfully, but the expected image data is missing.
@@ -49,10 +51,21 @@ const processImageResponse = (response: GenerateContentResponse): string => {
   return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
 };
 
+const handleApiError = (error: any, context: string): never => {
+    console.error(`Lỗi khi ${context}:`, error);
+    if (error.message && (error.message.includes('[429]') || error.message.includes('RESOURCE_EXHAUSTED'))) {
+        throw new Error("Hệ thống đang bị quá tải hoặc bạn đã hết hạn ngạch sử dụng. Vui lòng thử lại sau ít phút.");
+    }
+    if (error?.message) {
+      throw new Error(error.message);
+    }
+    throw new Error(`Không thể ${context} do lỗi không xác định. Vui lòng thử lại.`);
+};
+
+
 export const generateImageFromPrompt = async (prompt: string): Promise<string> => {
   try {
-    const genAI = getAi();
-    const response = await genAI.models.generateContent({
+    const response = await ai.models.generateContent({
       model: model,
       contents: {
         parts: [{ text: prompt }],
@@ -64,13 +77,7 @@ export const generateImageFromPrompt = async (prompt: string): Promise<string> =
 
     return processImageResponse(response);
   } catch (error: any) {
-    console.error("Lỗi khi tạo hình ảnh từ prompt:", error);
-    // Re-throw our custom, user-friendly errors from processImageResponse,
-    // or a message from an underlying API error.
-    if (error?.message) {
-      throw new Error(error.message);
-    }
-    throw new Error("Không thể tạo hình ảnh do lỗi không xác định. Vui lòng thử lại.");
+    handleApiError(error, 'tạo hình ảnh từ prompt');
   }
 };
 
@@ -80,7 +87,6 @@ export const generateSceneWithCharacter = async (
   scenePrompt: string
 ): Promise<string> => {
   try {
-    const genAI = getAi();
     const imageParts = characterImages.map(image => ({
         inlineData: {
             data: image.data,
@@ -88,7 +94,7 @@ export const generateSceneWithCharacter = async (
         },
     }));
 
-    const response = await genAI.models.generateContent({
+    const response = await ai.models.generateContent({
       model: model,
       contents: {
         parts: [
@@ -103,12 +109,6 @@ export const generateSceneWithCharacter = async (
 
     return processImageResponse(response);
   } catch (error: any) {
-    console.error("Lỗi khi tạo bối cảnh với nhân vật:", error);
-    // Re-throw our custom, user-friendly errors from processImageResponse,
-    // or a message from an underlying API error.
-    if (error?.message) {
-      throw new Error(error.message);
-    }
-    throw new Error("Không thể tạo bối cảnh do lỗi không xác định. Vui lòng thử lại.");
+    handleApiError(error, 'tạo bối cảnh với nhân vật');
   }
 };

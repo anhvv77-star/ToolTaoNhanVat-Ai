@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import type { Character } from '../types';
 import { fileToBase64 } from '../utils/fileUtils';
 import { generateImageFromPrompt } from '../services/geminiService';
-// FIX: Import ChevronLeftIcon
 import { UploadCloudIcon, WandSparklesIcon, ChevronLeftIcon } from './icons';
 
 interface CharacterCreatorProps {
@@ -10,6 +9,8 @@ interface CharacterCreatorProps {
   onCancel: () => void;
   characterToEdit?: Character | null;
 }
+
+const DRAFT_STORAGE_KEY = 'character_creator_draft';
 
 const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel, characterToEdit }) => {
   const [mode, setMode] = useState<'upload' | 'generate'>('generate');
@@ -30,6 +31,7 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel, c
 
   useEffect(() => {
     if (characterToEdit) {
+      // Nạp dữ liệu khi chỉnh sửa nhân vật
       setName(characterToEdit.name);
       setStyle(characterToEdit.style);
       setGender(characterToEdit.gender);
@@ -38,7 +40,25 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel, c
       setExpression(characterToEdit.expression);
       setGeneratedImage(characterToEdit.imageUrl);
       setUploadedImage(null);
-      setMode('generate'); // Default to this mode view
+      setMode('generate');
+    } else {
+      // Nạp bản nháp đã lưu khi tạo nhân vật mới
+      const savedDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (savedDraft) {
+        try {
+          const draft = JSON.parse(savedDraft);
+          setName(draft.name || '');
+          setStyle(draft.style || 'Realistic');
+          setGender(draft.gender || 'Nữ');
+          setAge(draft.age || '25');
+          setOutfit(draft.outfit || 'Trang phục công sở');
+          setExpression(draft.expression || 'Mỉm cười');
+          setPrompt(draft.prompt || '');
+        } catch (e) {
+          console.error("Không thể phân tích bản nháp nhân vật từ localStorage", e);
+          localStorage.removeItem(DRAFT_STORAGE_KEY); // Xóa dữ liệu bị hỏng
+        }
+      }
     }
   }, [characterToEdit]);
 
@@ -61,11 +81,11 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel, c
     setError(null);
     setUploadedImage(null);
     
-    let fullPrompt = `Một bức ảnh chân dung theo phong cách ${style} của một nhân vật ${gender}, khoảng ${age} tuổi, đang mặc ${outfit} với biểu cảm ${expression}.`;
+    let fullPrompt = `Một bức ảnh chân dung chất lượng cao, theo phong cách ${style}. Nhân vật là ${gender}, khoảng ${age} tuổi, mặc ${outfit}, và có biểu cảm ${expression}.`;
     if (prompt.trim()) {
-      fullPrompt += ` Các đặc điểm bổ sung: ${prompt}.`;
+      fullPrompt += ` Các chi tiết bổ sung: ${prompt}.`;
     }
-    fullPrompt += ' Nhân vật được hiển thị trên nền trắng đơn giản để dễ dàng tách nền.';
+    fullPrompt += ' Nhân vật được chụp trên nền trắng đơn giản.';
 
     try {
       const imageUrl = await generateImageFromPrompt(fullPrompt);
@@ -102,7 +122,31 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel, c
       ? { ...characterToEdit, ...characterData }
       : { id: crypto.randomUUID(), ...characterData };
     
+    localStorage.removeItem(DRAFT_STORAGE_KEY); // Xóa bản nháp khi lưu thành công
     onSave(characterToSave);
+  };
+
+  const handleCancelAndSaveDraft = () => {
+    // Chỉ lưu bản nháp khi tạo nhân vật mới, không lưu khi đang chỉnh sửa
+    if (!characterToEdit) {
+      const draft = {
+        name,
+        style,
+        gender,
+        age,
+        outfit,
+        expression,
+        prompt,
+      };
+      // Chỉ lưu nếu có nội dung
+      const isDraftEmpty = !Object.values(draft).some(value => typeof value === 'string' && value.trim() !== '');
+      if (!isDraftEmpty) {
+        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+      } else {
+        localStorage.removeItem(DRAFT_STORAGE_KEY); // Xóa nếu biểu mẫu trống
+      }
+    }
+    onCancel();
   };
   
   const isSaveDisabled = isLoading || (!uploadedImage && !generatedImage) || !name.trim();
@@ -110,7 +154,7 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel, c
   return (
     <div className="max-w-6xl mx-auto p-4 sm:p-6 md:p-8">
       <div className="flex items-center mb-6">
-        <button onClick={onCancel} className="p-2 rounded-full hover:bg-gray-700 mr-4">
+        <button onClick={handleCancelAndSaveDraft} className="p-2 rounded-full hover:bg-gray-700 mr-4">
             <ChevronLeftIcon className="w-6 h-6" />
         </button>
         <h1 className="text-3xl font-bold text-white">{characterToEdit ? 'Chỉnh Sửa Nhân Vật' : 'Tạo Nhân Vật Mới'}</h1>
@@ -190,7 +234,7 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel, c
           </div>
           {error && <p className="text-red-400 mt-4 text-sm">{error}</p>}
           <div className="mt-6 flex space-x-4">
-             <button onClick={onCancel} className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-md transition-colors duration-300">Hủy</button>
+             <button onClick={handleCancelAndSaveDraft} className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-md transition-colors duration-300">Hủy</button>
             <button onClick={handleSave} disabled={isSaveDisabled} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-4 rounded-md transition-colors duration-300 disabled:bg-gray-500 disabled:cursor-not-allowed">
                 {characterToEdit ? 'Lưu Thay Đổi' : 'Lưu Nhân Vật'}
             </button>

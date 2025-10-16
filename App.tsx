@@ -4,47 +4,23 @@ import CharacterLibrary from './components/CharacterLibrary';
 import CharacterCreator from './components/CharacterCreator';
 import SceneGenerator from './components/SceneGenerator';
 import ResultViewer from './components/ResultViewer';
-import ApiKeyModal from './components/ApiKeyModal'; // Import new component
 import { ASPECT_RATIOS } from './constants';
-import { generateSceneWithCharacter, initializeGemini } from './services/geminiService'; // Import initializer
+import { generateSceneWithCharacter } from './services/geminiService';
 import { base64ToImageData } from './utils/fileUtils';
 
-// A simple component to show a global error, e.g., if the API key is invalid.
-const GlobalError: React.FC<{ message: string; onClear: () => void }> = ({ message, onClear }) => (
-    <div className="fixed top-5 right-5 bg-red-500 text-white p-4 rounded-lg shadow-lg z-50 flex items-center gap-4">
-        <span>{message}</span>
-        <button onClick={onClear} className="font-bold text-lg">&times;</button>
-    </div>
-);
-
+const CHARACTERS_STORAGE_KEY = 'ai_character_library';
 
 const App: React.FC = () => {
-  const [apiKey, setApiKey] = useState<string | null>(() => localStorage.getItem('gemini_api_key'));
-  const [globalError, setGlobalError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (apiKey) {
-      try {
-        initializeGemini(apiKey);
-      } catch (error: any) {
-        console.error("Failed to initialize Gemini:", error);
-        setGlobalError("Không thể khởi tạo dịch vụ AI. Vui lòng kiểm tra API Key.");
-        localStorage.removeItem('gemini_api_key');
-        setApiKey(null);
-      }
-    }
-  }, [apiKey]);
-
-  const handleSaveApiKey = (key: string) => {
-    if (key.trim()) {
-      localStorage.setItem('gemini_api_key', key);
-      setApiKey(key);
-      setGlobalError(null); // Clear error on new key
-    }
-  };
-
   const [view, setView] = useState<AppView>('library');
-  const [characters, setCharacters] = useState<Character[]>([]);
+  const [characters, setCharacters] = useState<Character[]>(() => {
+    try {
+      const savedCharacters = localStorage.getItem(CHARACTERS_STORAGE_KEY);
+      return savedCharacters ? JSON.parse(savedCharacters) : [];
+    } catch (error) {
+      console.error("Không thể tải nhân vật từ localStorage", error);
+      return [];
+    }
+  });
   const [selectedCharacterIds, setSelectedCharacterIds] = useState<string[]>([]);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [characterToEdit, setCharacterToEdit] = useState<Character | null>(null);
@@ -54,21 +30,36 @@ const App: React.FC = () => {
   const [sceneAspectRatio, setSceneAspectRatio] = useState<AspectRatio>(ASPECT_RATIOS[0]);
   const [isLoading, setIsLoading] = useState(false);
   const [sceneError, setSceneError] = useState<string | null>(null);
+  
+  // Persist characters to localStorage whenever they change
+  useEffect(() => {
+    try {
+        localStorage.setItem(CHARACTERS_STORAGE_KEY, JSON.stringify(characters));
+    } catch (error) {
+        console.error("Không thể lưu nhân vật vào localStorage", error);
+    }
+  }, [characters]);
+
 
   const handleSaveCharacter = useCallback((character: Character) => {
-    const existingIndex = characters.findIndex(c => c.id === character.id);
-    if (existingIndex !== -1) {
-      // Update existing character
-      const updatedCharacters = [...characters];
-      updatedCharacters[existingIndex] = character;
-      setCharacters(updatedCharacters);
-    } else {
-      // Add new character
-      setCharacters(prev => [...prev, character]);
-    }
-    setCharacterToEdit(null); // Reset editing state
+    setCharacters(prev => {
+      const existingIndex = prev.findIndex(c => c.id === character.id);
+      if (existingIndex !== -1) {
+        const updated = [...prev];
+        updated[existingIndex] = character;
+        return updated;
+      }
+      return [...prev, character];
+    });
+    setCharacterToEdit(null);
     setView('library');
-  }, [characters]);
+  }, []);
+
+  const handleDeleteCharacter = useCallback((id: string) => {
+    setCharacters(prev => prev.filter(c => c.id !== id));
+    setSelectedCharacterIds(prev => prev.filter(selectedId => selectedId !== id));
+  }, []);
+
 
   const handleStartEditCharacter = useCallback((id: string) => {
     const charToEdit = characters.find(c => c.id === id);
@@ -103,7 +94,7 @@ const App: React.FC = () => {
       ? 'các nhân vật được cung cấp' 
       : 'nhân vật được cung cấp';
 
-    const fullPrompt = `Tạo một hình ảnh nghệ thuật với tỷ lệ khung hình ${sceneAspectRatio.value}. Trong hình, ${characterDescription} đang ở trong một bối cảnh được mô tả là: "${scenePrompt}". Giữ nguyên hoàn toàn ngoại hình của (các) nhân vật từ (các) hình ảnh gốc và phối hợp họ vào bối cảnh mới một cách liền mạch, chú ý đến ánh sáng, bóng đổ và phối cảnh tự nhiên.`;
+    const fullPrompt = `Đặt ${characterDescription} vào bối cảnh được mô tả là: "${scenePrompt}". Giữ nguyên hoàn toàn ngoại hình và phong cách của nhân vật từ ảnh gốc. Hợp nhất nhân vật vào cảnh một cách liền mạch và chân thực. Tỷ lệ khung hình của ảnh phải là ${sceneAspectRatio.value}.`;
 
     try {
         const characterImageData = selectedCharacters.map(char => base64ToImageData(char.imageUrl));
@@ -111,13 +102,7 @@ const App: React.FC = () => {
         setGeneratedImage(resultImage);
         setView('results');
     } catch (err: any) {
-        if (err.message.includes('API key not valid')) {
-             setGlobalError('API Key không hợp lệ. Vui lòng nhập lại.');
-             localStorage.removeItem('gemini_api_key');
-             setApiKey(null);
-        } else {
-            setSceneError(err.message || 'Đã xảy ra lỗi khi tạo bối cảnh.');
-        }
+        setSceneError(err.message || 'Đã xảy ra lỗi khi tạo bối cảnh.');
     } finally {
         setIsLoading(false);
     }
@@ -180,6 +165,7 @@ const App: React.FC = () => {
               setView('createScene')
             }}
             onEditCharacter={handleStartEditCharacter}
+            onDeleteCharacter={handleDeleteCharacter}
           />
         );
     }
@@ -187,12 +173,7 @@ const App: React.FC = () => {
 
   return (
     <main className="min-h-screen bg-gray-900 text-gray-100">
-      {globalError && <GlobalError message={globalError} onClear={() => setGlobalError(null)} />}
-      {!apiKey ? (
-          <ApiKeyModal onSave={handleSaveApiKey} />
-      ) : (
-          renderView()
-      )}
+      {renderView()}
     </main>
   );
 };

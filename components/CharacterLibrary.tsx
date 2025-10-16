@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Character } from '../types';
-import { PlusCircleIcon, UsersIcon, CheckCircleIcon, DownloadIcon, EditIcon } from './icons';
+import { PlusCircleIcon, UsersIcon, CheckCircleIcon, DownloadIcon, EditIcon, TrashIcon } from './icons';
 
 interface CharacterLibraryProps {
   characters: Character[];
@@ -9,9 +9,10 @@ interface CharacterLibraryProps {
   onCreateCharacter: () => void;
   onGenerateScene: () => void;
   onEditCharacter: (id: string) => void;
+  onDeleteCharacter: (id: string) => void;
 }
 
-const CharacterLibrary: React.FC<CharacterLibraryProps> = ({ characters, selectedCharacterIds, onSelectCharacter, onCreateCharacter, onGenerateScene, onEditCharacter }) => {
+const CharacterLibrary: React.FC<CharacterLibraryProps> = ({ characters, selectedCharacterIds, onSelectCharacter, onCreateCharacter, onGenerateScene, onEditCharacter, onDeleteCharacter }) => {
   const handleDownloadCharacter = (e: React.MouseEvent, char: Character) => {
     e.stopPropagation(); // Ngăn chặn sự kiện click của thẻ cha (chọn nhân vật)
     const link = document.createElement('a');
@@ -20,6 +21,13 @@ const CharacterLibrary: React.FC<CharacterLibraryProps> = ({ characters, selecte
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, char: Character) => {
+    e.stopPropagation();
+    if (window.confirm(`Bạn có chắc chắn muốn xóa nhân vật "${char.name}" không?`)) {
+        onDeleteCharacter(char.id);
+    }
   };
 
   return (
@@ -72,6 +80,14 @@ const CharacterLibrary: React.FC<CharacterLibraryProps> = ({ characters, selecte
                 title={`Chỉnh sửa ${char.name}`}
                 >
                 <EditIcon className="w-5 h-5" />
+                </button>
+                 <button
+                onClick={(e) => handleDeleteClick(e, char)}
+                className="p-1.5 bg-black/50 rounded-full text-white hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                aria-label={`Xóa ${char.name}`}
+                title={`Xóa ${char.name}`}
+                >
+                <TrashIcon className="w-5 h-5" />
                 </button>
             </div>
             <img src={char.imageUrl} alt={char.name} className="w-full h-full object-cover aspect-[3/4]" />
