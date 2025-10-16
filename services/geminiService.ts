@@ -1,14 +1,5 @@
 import { GoogleGenAI, Modality, GenerateContentResponse } from "@google/genai";
 
-const API_KEY = process.env.API_KEY;
-
-if (!API_KEY) {
-  console.error("API_KEY is not set in environment variables.");
-}
-
-const ai = new GoogleGenAI({ apiKey: API_KEY! });
-const model = 'gemini-2.5-flash-image';
-
 const processImageResponse = (response: GenerateContentResponse): string => {
   // Case 1: Prompt was blocked upfront.
   if (response.promptFeedback?.blockReason) {
@@ -39,8 +30,22 @@ const processImageResponse = (response: GenerateContentResponse): string => {
   return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
 };
 
-export const generateImageFromPrompt = async (prompt: string): Promise<string> => {
+const handleApiError = (error: any): never => {
+  console.error("Lỗi gọi API Gemini:", error);
+  if (error?.message?.includes('API key not valid')) {
+    throw new Error("API Key không hợp lệ. Vui lòng kiểm tra lại.");
+  }
+  if (error?.message) {
+    throw new Error(error.message);
+  }
+  throw new Error("Không thể thực hiện yêu cầu do lỗi không xác định. Vui lòng thử lại.");
+}
+
+export const generateImageFromPrompt = async (apiKey: string, prompt: string): Promise<string> => {
   try {
+    const ai = new GoogleGenAI({ apiKey });
+    const model = 'gemini-2.5-flash-image';
+    
     const response = await ai.models.generateContent({
       model: model,
       contents: {
@@ -53,22 +58,20 @@ export const generateImageFromPrompt = async (prompt: string): Promise<string> =
 
     return processImageResponse(response);
   } catch (error: any) {
-    console.error("Lỗi khi tạo hình ảnh từ prompt:", error);
-    // Re-throw our custom, user-friendly errors from processImageResponse,
-    // or a message from an underlying API error.
-    if (error?.message) {
-      throw new Error(error.message);
-    }
-    throw new Error("Không thể tạo hình ảnh do lỗi không xác định. Vui lòng thử lại.");
+    handleApiError(error);
   }
 };
 
 
 export const generateSceneWithCharacter = async (
+  apiKey: string,
   characterImages: { data: string; mimeType: string }[],
   scenePrompt: string
 ): Promise<string> => {
   try {
+    const ai = new GoogleGenAI({ apiKey });
+    const model = 'gemini-2.5-flash-image';
+
     const imageParts = characterImages.map(image => ({
         inlineData: {
             data: image.data,
@@ -91,12 +94,6 @@ export const generateSceneWithCharacter = async (
 
     return processImageResponse(response);
   } catch (error: any) {
-    console.error("Lỗi khi tạo bối cảnh với nhân vật:", error);
-    // Re-throw our custom, user-friendly errors from processImageResponse,
-    // or a message from an underlying API error.
-    if (error?.message) {
-      throw new Error(error.message);
-    }
-    throw new Error("Không thể tạo bối cảnh do lỗi không xác định. Vui lòng thử lại.");
+    handleApiError(error);
   }
 };

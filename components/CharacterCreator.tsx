@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { Character } from '../types';
 import { fileToBase64 } from '../utils/fileUtils';
@@ -9,9 +8,11 @@ import { GENERATION_LIMIT, SESSION_STORAGE_GENERATION_COUNT_KEY } from '../const
 interface CharacterCreatorProps {
   onSave: (character: Character) => void;
   onCancel: () => void;
+  apiKey: string;
+  onInvalidApiKey: () => void;
 }
 
-const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel }) => {
+const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel, apiKey, onInvalidApiKey }) => {
   const [mode, setMode] = useState<'upload' | 'generate'>('generate');
   
   const [name, setName] = useState('');
@@ -68,13 +69,17 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel })
     fullPrompt += ' Nhân vật được hiển thị trên nền trắng đơn giản để dễ dàng tách nền.';
 
     try {
-      const imageUrl = await generateImageFromPrompt(fullPrompt);
+      const imageUrl = await generateImageFromPrompt(apiKey, fullPrompt);
       setGeneratedImage(imageUrl);
       const newCount = generationCount + 1;
       setGenerationCount(newCount);
       sessionStorage.setItem(SESSION_STORAGE_GENERATION_COUNT_KEY, newCount.toString());
     } catch (err: any) {
-      setError(err.message || 'Đã xảy ra lỗi khi tạo nhân vật.');
+      const errorMessage = err.message || 'Đã xảy ra lỗi khi tạo nhân vật.';
+      setError(errorMessage);
+      if (errorMessage.includes('API Key không hợp lệ')) {
+        onInvalidApiKey();
+      }
     } finally {
       setIsLoading(false);
     }

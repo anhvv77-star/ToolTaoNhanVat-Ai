@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import type { AppView, Character, AspectRatio, Scene } from './types';
 import CharacterLibrary from './components/CharacterLibrary';
@@ -6,11 +5,16 @@ import CharacterCreator from './components/CharacterCreator';
 import SceneGenerator from './components/SceneGenerator';
 import ResultViewer from './components/ResultViewer';
 import ConfirmationModal from './components/ConfirmationModal';
+import ApiKeyModal from './components/ApiKeyModal';
 import { ASPECT_RATIOS } from './constants';
 import { generateSceneWithCharacter } from './services/geminiService';
 import { base64ToImageData } from './utils/fileUtils';
 
+const API_KEY_STORAGE_KEY = 'gemini-api-key';
+
 const App: React.FC = () => {
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [apiKeyError, setApiKeyError] = useState<string | null>(null);
   const [view, setView] = useState<AppView>('library');
   const [characters, setCharacters] = useState<Character[]>([]);
   const [savedScenes, setSavedScenes] = useState<Scene[]>([]);
@@ -25,6 +29,20 @@ const App: React.FC = () => {
 
   // State for delete confirmation
   const [characterToDelete, setCharacterToDelete] = useState<Character | null>(null);
+  
+  // --- API Key Persistence ---
+  useEffect(() => {
+    const storedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+    if (storedKey) {
+      setApiKey(storedKey);
+    }
+  }, []);
+
+  const handleSaveApiKey = (key: string) => {
+    setApiKey(key);
+    setApiKeyError(null);
+    localStorage.setItem(API_KEY_STORAGE_KEY, key);
+  };
   
   // --- Data Persistence ---
   useEffect(() => {
@@ -93,6 +111,10 @@ const App: React.FC = () => {
   }, [characters, selectedCharacterIds]);
 
   const handleGenerateScene = async () => {
+    if (!apiKey) {
+      setSceneError('Lỗi: API Key không được tìm thấy. Vui lòng làm mới trang và nhập lại.');
+      return;
+    }
     if (!scenePrompt.trim()) {
       setSceneError('Vui lòng nhập mô tả bối cảnh.');
       return;
@@ -109,11 +131,17 @@ const App: React.FC = () => {
 
     try {
         const characterImageData = selectedCharacters.map(char => base64ToImageData(char.imageUrl));
-        const resultImage = await generateSceneWithCharacter(characterImageData, fullPrompt);
+        const resultImage = await generateSceneWithCharacter(apiKey, characterImageData, fullPrompt);
         setGeneratedImage(resultImage);
         setView('results');
     } catch (err: any) {
-        setSceneError(err.message || 'Đã xảy ra lỗi khi tạo bối cảnh.');
+        const errorMessage = err.message || 'Đã xảy ra lỗi khi tạo bối cảnh.';
+        setSceneError(errorMessage);
+        if (errorMessage.includes('API Key không hợp lệ')) {
+          localStorage.removeItem(API_KEY_STORAGE_KEY);
+          setApiKey(null);
+          setApiKeyError(errorMessage);
+        }
     } finally {
         setIsLoading(false);
     }
@@ -147,7 +175,16 @@ const App: React.FC = () => {
   const renderView = () => {
     switch (view) {
       case 'createCharacter':
-        return <CharacterCreator onSave={handleSaveCharacter} onCancel={() => setView('library')} />;
+        return <CharacterCreator 
+                  apiKey={apiKey!} 
+                  onSave={handleSaveCharacter} 
+                  onCancel={() => setView('library')} 
+                  onInvalidApiKey={() => {
+                     localStorage.removeItem(API_KEY_STORAGE_KEY);
+                     setApiKey(null);
+                     setApiKeyError("API Key của bạn không hợp lệ hoặc đã hết hạn. Vui lòng nhập lại.");
+                  }}
+                />;
       case 'createScene':
         if (selectedCharacters.length === 0) {
           setView('library');
@@ -191,6 +228,10 @@ const App: React.FC = () => {
         );
     }
   };
+
+  if (!apiKey) {
+    return <ApiKeyModal onSave={handleSaveApiKey} initialError={apiKeyError || undefined} />;
+  }
 
   return (
     <main className="min-h-screen bg-gray-900 text-gray-100">
