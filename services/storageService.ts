@@ -16,6 +16,7 @@ const DATA_FILE_NAME = 'ai-character-data.json';
 let tokenClient: any = null;
 let gapiInited = false;
 let gisInited = false;
+let initPromise: Promise<void> | null = null;
 
 interface AppData {
   characters: Character[];
@@ -46,40 +47,62 @@ const clearLocalData = (): void => {
 
 // --- Google Drive Implementation ---
 
-/**
- * Initializes the GAPI client.
- */
-const gapiInit = (): Promise<void> => {
-    return new Promise((resolve, reject) => {
-        window.gapi.load('client', async () => {
-            try {
-                await window.gapi.client.init({
-                    // apiKey: API_KEY, // API Key is not needed for OAuth2
-                    discoveryDocs: [DISCOVERY_DOC],
-                });
-                gapiInited = true;
-                resolve();
-            } catch (error) {
-                reject(error);
-            }
-        });
-    });
+const waitForGlobal = <T>(name: string, timeout = 10000): Promise<T> => {
+  return new Promise((resolve, reject) => {
+    let elapsed = 0;
+    const interval = 100;
+    const check = () => {
+      if ((window as any)[name]) {
+        resolve((window as any)[name] as T);
+      } else {
+        elapsed += interval;
+        if (elapsed >= timeout) {
+          reject(new Error(`Timed out waiting for global variable '${name}'`));
+          return;
+        }
+        setTimeout(check, interval);
+      }
+    };
+    check();
+  });
 };
 
-/**
- * Initializes the GIS client.
- */
-const gisInit = (): Promise<void> => {
-    return new Promise((resolve) => {
-        tokenClient = window.google.accounts.oauth2.initTokenClient({
+const initializeGoogleApis = async (): Promise<void> => {
+    if (gapiInited && gisInited) return;
+
+    try {
+        const gapi = await waitForGlobal<any>('gapi');
+        const google = await waitForGlobal<any>('google');
+
+        await new Promise<void>((resolve, reject) => {
+            gapi.load('client', {
+                callback: resolve,
+                onerror: reject,
+                timeout: 5000,
+                ontimeout: reject,
+            });
+        });
+
+        await gapi.client.init({
+            discoveryDocs: [DISCOVERY_DOC],
+        });
+        gapiInited = true;
+
+        tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID,
             scope: SCOPES,
             callback: () => {}, // Callback is handled by the promise
         });
         gisInited = true;
-        resolve();
-    });
+    } catch (error) {
+        console.error("Failed to initialize Google API clients:", error);
+        gapiInited = false;
+        gisInited = false;
+        initPromise = null; // Allow retries
+        throw new Error("Initialization with Google services failed.");
+    }
 };
+
 
 const findDataFile = async (): Promise<string | null> => {
     try {
@@ -178,9 +201,11 @@ const clearDriveData = async (): Promise<void> => {
 
 // --- Public Service Interface ---
 export const storageService = {
-    initGoogleApis: async (): Promise<void> => {
-        await gapiInit();
-        await gisInit();
+    initGoogleApis: (): Promise<void> => {
+        if (!initPromise) {
+            initPromise = initializeGoogleApis();
+        }
+        return initPromise;
     },
 
     signIn: (): Promise<any> => {

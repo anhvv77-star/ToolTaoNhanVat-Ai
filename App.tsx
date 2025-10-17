@@ -49,35 +49,62 @@ const App: React.FC = () => {
 
   // --- Initialize APIs and Load Initial Data ---
   useEffect(() => {
-    // Load API Key
-    const storedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
-    if (storedKey) setApiKey(storedKey);
-
-    // Initialize Google APIs
-    const init = async () => {
+    const startup = async () => {
       try {
-        await storageService.initGoogleApis();
-        setIsAuthReady(true);
-      } catch (e) {
-        console.error("Error initializing Google APIs", e);
-        setStorageError("Không thể kết nối đến dịch vụ của Google.");
+        setIsDataLoading(true);
+
+        const storedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+        if (storedKey) setApiKey(storedKey);
+        
+        let driveReady = false;
+        try {
+          await storageService.initGoogleApis();
+          driveReady = true;
+          setIsAuthReady(true);
+        } catch (e) {
+          console.error("Error initializing Google APIs", e);
+          setIsAuthReady(false);
+          // Error will be handled based on selected storage mode
+        }
+
+        let mode = localStorage.getItem(STORAGE_MODE_KEY) as StorageMode | null;
+        if (!mode) {
+          setStorageMode('unselected');
+          return;
+        }
+
+        if (mode === 'drive' && !driveReady) {
+          setStorageError("Không thể kết nối đến Google Drive. Đã tự động chuyển sang chế độ lưu cục bộ.");
+          mode = 'local';
+          localStorage.setItem(STORAGE_MODE_KEY, 'local');
+        }
+        setStorageMode(mode);
+
+      } finally {
+        // This startup effect's only job is to set the mode.
+        // The data loading effect will trigger based on the mode change.
+        // We set loading to false here to unblock the UI if no mode was selected.
+        if (storageMode === 'unselected') {
+            setIsDataLoading(false);
+        }
       }
     };
-    init();
 
-    // Determine storage mode
-    const mode = localStorage.getItem(STORAGE_MODE_KEY) as StorageMode | null;
-    if (mode) {
-      setStorageMode(mode);
-    } else {
-      setStorageMode('unselected');
-      setIsDataLoading(false); // No data to load yet
-    }
+    startup();
   }, []);
   
   // --- Load data based on storage mode ---
   useEffect(() => {
-      if (storageMode === 'unselected' || !isAuthReady) return;
+      if (storageMode === 'unselected') {
+          setIsDataLoading(false);
+          return;
+      }
+      
+      // Don't try to load from drive if the API isn't ready.
+      if (storageMode === 'drive' && !isAuthReady) {
+          setIsDataLoading(false);
+          return; // The error is already set from the startup effect.
+      }
 
       const loadData = async () => {
         setIsDataLoading(true);
@@ -94,7 +121,7 @@ const App: React.FC = () => {
       };
       
       loadData();
-  }, [storageMode, isAuthReady, isAuthenticated]);
+  }, [storageMode, isAuthenticated]);
 
 
   // --- Data Persistence using storageService ---
@@ -311,7 +338,7 @@ const App: React.FC = () => {
     <main className="min-h-screen bg-gray-900 text-gray-100">
       {storageError && (
         <div className="bg-yellow-500/20 border-l-4 border-yellow-500 text-yellow-300 p-4 sticky top-0 z-50 flex justify-between items-center" role="alert">
-          <div className="flex items-center"><AlertTriangleIcon className="h-6 w-6 mr-3"/><div><p className="font-bold">Lỗi</p><p className="text-sm">{storageError}</p></div></div>
+          <div className="flex items-center"><AlertTriangleIcon className="h-6 w-6 mr-3"/><div><p className="font-bold">Thông báo</p><p className="text-sm">{storageError}</p></div></div>
           <button onClick={() => setStorageError(null)} className="p-1 rounded-md hover:bg-yellow-500/30"><XIcon className="h-5 w-5"/></button>
         </div>
       )}
