@@ -7,7 +7,26 @@ declare global {
   }
 }
 
-const CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID || '';
+// Helper to load a script dynamically and return a promise
+const loadScript = (src: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    // If script already exists, don't load it again
+    if (document.querySelector(`script[src="${src}"]`)) {
+        return resolve();
+    }
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = (err) => reject(new Error(`Failed to load script: ${src}. Error: ${err}`));
+    document.head.appendChild(script);
+  });
+};
+
+
+// FIX: Hardcoded the provided Google Client ID to ensure it's always available.
+const CLIENT_ID = '939227485257-jigsek0srr96jannl33hg18fsrmct9he.apps.googleusercontent.com';
 const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const DATA_FILE_NAME = 'ai-character-data.json';
@@ -45,64 +64,53 @@ const clearLocalData = (): void => {
 }
 
 // --- Google Drive Implementation ---
-
-const waitForGlobal = <T>(name: string, timeout = 10000): Promise<T> => {
-  return new Promise((resolve, reject) => {
-    let elapsed = 0;
-    const interval = 100;
-    const check = () => {
-      if ((window as any)[name]) {
-        resolve((window as any)[name] as T);
-      } else {
-        elapsed += interval;
-        if (elapsed >= timeout) {
-          reject(new Error(`Timed out waiting for global variable '${name}'`));
-          return;
-        }
-        setTimeout(check, interval);
-      }
-    };
-    check();
-  });
-};
-
+// New, robust initialization logic
 const initializeGoogleApis = async (): Promise<void> => {
-    if (gapiInited && gisInited) return;
+    if (gapiInited && gisInited) {
+        return;
+    }
 
     if (!CLIENT_ID) {
-        throw new Error("VITE_GOOGLE_CLIENT_ID is not configured. Please add it to your environment file.");
+        console.error("VITE_GOOGLE_CLIENT_ID is not configured. Google Drive integration is disabled.");
+        throw new Error("Google Client ID is missing. Please add it to your environment file to use Google Drive sync.");
     }
 
     try {
-        const gapi = await waitForGlobal<any>('gapi');
-        const google = await waitForGlobal<any>('google');
+        // Load Google API scripts dynamically and wait for them to be ready.
+        await Promise.all([
+            loadScript('https://apis.google.com/js/api.js'),
+            loadScript('https://accounts.google.com/gsi/client'),
+        ]);
 
+        // Initialize GAPI client for Drive API
         await new Promise<void>((resolve, reject) => {
-            gapi.load('client', {
+            window.gapi.load('client', {
                 callback: resolve,
                 onerror: reject,
-                timeout: 5000,
-                ontimeout: reject,
+                timeout: 5000, // 5 seconds
+                ontimeout: () => reject(new Error('gapi.load("client") timed out.')),
             });
         });
 
-        await gapi.client.init({
+        await window.gapi.client.init({
             discoveryDocs: [DISCOVERY_DOC],
         });
         gapiInited = true;
 
-        tokenClient = google.accounts.oauth2.initTokenClient({
+        // Initialize GIS client for authentication
+        tokenClient = window.google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID,
             scope: SCOPES,
-            callback: () => {}, // Callback is handled by the promise
+            callback: () => {}, // Callback is handled by the promise in signIn
         });
         gisInited = true;
+
     } catch (error) {
         console.error("Failed to initialize Google API clients:", error);
         gapiInited = false;
         gisInited = false;
         initPromise = null; // Allow retries
-        throw new Error("Initialization with Google services failed.");
+        throw new Error("Không thể kết nối đến dịch vụ của Google. Vui lòng kiểm tra lại kết nối mạng của bạn.");
     }
 };
 
@@ -221,9 +229,14 @@ export const storageService = {
                      if (resp.error !== undefined) {
                         return reject(resp);
                     }
+                    // This is the crucial fix: ensure GAPI client has the token.
+                    window.gapi.client.setToken(resp);
                     resolve(resp);
                 };
+
+                // Request token. This will trigger a popup if needed.
                 tokenClient.requestAccessToken({ prompt: '' });
+
             }).catch(err => {
                 console.error("Sign-in failed due to initialization error:", err);
                 reject(err);
