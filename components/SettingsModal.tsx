@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { AlertTriangleIcon, TrashIcon } from './icons';
+import { AlertTriangleIcon, TrashIcon, GoogleIcon, CloudIcon } from './icons';
+import type { StorageMode } from '../types';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -7,6 +8,13 @@ interface SettingsModalProps {
   onClearData: () => void;
   characterCount: number;
   sceneCount: number;
+  storageMode: StorageMode;
+  isAuthenticated: boolean;
+  onSignIn: () => void;
+  onSignOut: () => void;
+  onSwitchToLocal: () => void;
+  onSwitchToDrive: () => void;
+  user: any;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ 
@@ -14,7 +22,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose, 
   onClearData, 
   characterCount, 
-  sceneCount 
+  sceneCount,
+  storageMode,
+  isAuthenticated,
+  onSignIn,
+  onSignOut,
+  onSwitchToLocal,
+  onSwitchToDrive,
+  user
 }) => {
   const [showConfirmation, setShowConfirmation] = useState(false);
 
@@ -24,7 +39,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleClearClick = () => {
     onClearData();
-    setShowConfirmation(false); // Reset confirmation state
+    setShowConfirmation(false);
   };
 
   const handleCancel = () => {
@@ -43,11 +58,49 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         className="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-lg m-4 text-white border border-gray-700"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-2xl font-bold mb-4">Cài đặt & Quản lý Dữ liệu</h2>
+        <h2 className="text-2xl font-bold mb-6">Cài đặt & Quản lý Dữ liệu</h2>
         
+        {/* Storage and Sync Section */}
         <div className="bg-gray-700/50 p-4 rounded-md mb-6">
-          <h3 className="font-semibold text-cyan-400 mb-2">Thống kê Dữ liệu</h3>
-          <p className="text-gray-300">Dữ liệu của bạn được lưu trữ an toàn trong bộ nhớ cục bộ của trình duyệt.</p>
+          <h3 className="font-semibold text-cyan-400 mb-3">Lưu trữ & Đồng bộ</h3>
+          {isAuthenticated && user && (
+             <div className="flex items-center justify-between bg-gray-900/50 p-3 rounded-md mb-4">
+              <div className="flex items-center gap-3">
+                <img src={user.picture} alt={user.name} className="w-10 h-10 rounded-full" />
+                <div>
+                  <p className="font-semibold text-white">{user.name}</p>
+                  <p className="text-xs text-gray-400">{user.email}</p>
+                </div>
+              </div>
+              <button onClick={onSignOut} className="text-sm text-red-400 hover:underline">Đăng xuất</button>
+            </div>
+          )}
+
+          <div className="flex items-center gap-4 p-3 rounded-md"
+            style={{background: storageMode === 'drive' ? 'rgba(22, 163, 74, 0.1)' : 'rgba(107, 114, 128, 0.1)'}}
+          >
+              <CloudIcon className={`w-8 h-8 ${storageMode === 'drive' ? 'text-green-400' : 'text-gray-400'}`} />
+              <div>
+                  <p className="font-semibold">
+                      {storageMode === 'drive' ? 'Dữ liệu được đồng bộ với Google Drive' : 'Dữ liệu chỉ được lưu trên thiết bị này'}
+                  </p>
+                  {storageMode === 'local' && !isAuthenticated && (
+                       <button onClick={onSignIn} className="text-sm text-cyan-400 hover:underline">Đăng nhập để đồng bộ</button>
+                  )}
+                   {storageMode === 'local' && isAuthenticated && (
+                       <button onClick={onSwitchToDrive} className="text-sm text-green-400 hover:underline">Chuyển sang lưu trên Google Drive</button>
+                  )}
+                  {storageMode === 'drive' && (
+                       <button onClick={onSwitchToLocal} className="text-sm text-yellow-400 hover:underline">Chuyển sang lưu trên thiết bị này</button>
+                  )}
+              </div>
+          </div>
+        </div>
+
+
+        {/* Data Stats Section */}
+        <div className="bg-gray-700/50 p-4 rounded-md mb-6">
+          <h3 className="font-semibold text-cyan-400 mb-2">Thống kê Dữ liệu Hiện tại</h3>
           <div className="mt-3 flex space-x-6">
             <div className="text-center">
               <p className="text-2xl font-bold text-white">{characterCount}</p>
@@ -60,12 +113,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         </div>
 
+        {/* Danger Zone Section */}
         <div className="bg-red-900/20 border border-red-500/30 p-4 rounded-md">
           <h3 className="font-semibold text-red-400 mb-2 flex items-center">
             <AlertTriangleIcon className="w-5 h-5 mr-2"/>
             Vùng Nguy hiểm
           </h3>
-          <p className="text-gray-300 text-sm mb-4">Hành động bên dưới sẽ xóa vĩnh viễn toàn bộ nhân vật và bối cảnh đã lưu của bạn. Hành động này không thể hoàn tác.</p>
+          <p className="text-gray-300 text-sm mb-4">Hành động này sẽ xóa vĩnh viễn dữ liệu từ <strong className="font-bold">{storageMode === 'drive' ? 'Google Drive' : 'thiết bị này'}</strong>. Không thể hoàn tác.</p>
           
           {!showConfirmation ? (
             <button

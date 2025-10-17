@@ -27,3 +27,5 @@ export interface SuggestionCategory {
   name: string;
   suggestions: string[];
 }
+
+export type StorageMode = 'local' | 'drive' | 'unselected';
