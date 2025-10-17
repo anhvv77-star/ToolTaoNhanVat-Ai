@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import type { Character } from '../types';
+import type { Character, SuggestionCategory } from '../types';
 import { fileToBase64 } from '../utils/fileUtils';
-import { generateImageFromPrompt } from '../services/geminiService';
-import { UploadCloudIcon, WandSparklesIcon, ChevronLeftIcon } from './icons';
-import { GENERATION_LIMIT, SESSION_STORAGE_GENERATION_COUNT_KEY } from '../constants';
+import { getSuggestions, generateImageFromPrompt } from '../services/geminiService';
+import { UploadCloudIcon, WandSparklesIcon, ChevronLeftIcon, LightbulbIcon } from './icons';
 
 interface CharacterCreatorProps {
   onSave: (character: Character) => void;
@@ -29,15 +28,9 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel, a
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [generationCount, setGenerationCount] = useState<number>(0);
-
-  useEffect(() => {
-    const storedCount = sessionStorage.getItem(SESSION_STORAGE_GENERATION_COUNT_KEY);
-    setGenerationCount(storedCount ? parseInt(storedCount, 10) : 0);
-  }, []);
-
-  const isLimitReached = generationCount >= GENERATION_LIMIT;
-  const remainingGenerations = GENERATION_LIMIT - generationCount;
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [suggestions, setSuggestions] = useState<SuggestionCategory[]>([]);
+  const [suggestionError, setSuggestionError] = useState<string | null>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -53,11 +46,6 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel, a
   };
 
   const handleGenerate = async () => {
-    if (isLimitReached) {
-      setError('Bạn đã hết lượt tạo nhân vật trong phiên này. Vui lòng làm mới trang để bắt đầu phiên mới.');
-      return;
-    }
-
     setIsLoading(true);
     setError(null);
     setUploadedImage(null);
@@ -71,9 +59,6 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel, a
     try {
       const imageUrl = await generateImageFromPrompt(apiKey, fullPrompt);
       setGeneratedImage(imageUrl);
-      const newCount = generationCount + 1;
-      setGenerationCount(newCount);
-      sessionStorage.setItem(SESSION_STORAGE_GENERATION_COUNT_KEY, newCount.toString());
     } catch (err: any) {
       const errorMessage = err.message || 'Đã xảy ra lỗi khi tạo nhân vật.';
       setError(errorMessage);
@@ -84,6 +69,26 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel, a
       setIsLoading(false);
     }
   };
+  
+  const handleGetSuggestions = async () => {
+    setIsSuggesting(true);
+    setSuggestionError(null);
+    setSuggestions([]);
+    try {
+      const userPrompt = "Yêu cầu: Hãy tạo các gợi ý mô tả 'nhân vật' đại diện cho các sản phẩm và dịch vụ đó. Chỉ trả về một đối tượng JSON có khóa 'categories' chứa một mảng các đối tượng, mỗi đối tượng có khóa 'name' (tên danh mục) và 'suggestions' (mảng các chuỗi gợi ý).";
+      const result = await getSuggestions(apiKey, userPrompt);
+      setSuggestions(result);
+    } catch (err: any) {
+      setSuggestionError(err.message || 'Không thể lấy gợi ý.');
+    } finally {
+      setIsSuggesting(false);
+    }
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setPrompt(prev => prev ? `${prev}, ${suggestion}` : suggestion);
+  };
+
 
   const handleSave = () => {
     if (!name.trim()) {
@@ -153,15 +158,50 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel, a
           
           {mode === 'generate' ? (
             <div className="mt-4 space-y-4">
-              <textarea placeholder="Mô tả thêm về nhân vật (VD: tóc vàng, mắt xanh, đeo kính...)" value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={4} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none"></textarea>
-              <div className="text-center text-sm text-gray-400">
-                {isLimitReached ? (
-                  <span className="text-yellow-400 font-medium">Bạn đã đạt đến giới hạn tạo nhân vật cho phiên này.</span>
-                ) : (
-                  <span>Số lượt tạo còn lại: {remainingGenerations}</span>
-                )}
+              <div className="flex justify-between items-center">
+                  <label htmlFor="prompt-textarea" className="text-sm font-medium text-gray-300">Mô tả thêm về nhân vật</label>
+                  <button 
+                      onClick={handleGetSuggestions} 
+                      disabled={isSuggesting}
+                      className="flex items-center text-xs text-cyan-400 hover:text-cyan-300 disabled:text-gray-500 disabled:cursor-wait"
+                  >
+                      <LightbulbIcon className="w-4 h-4 mr-1" />
+                      {isSuggesting ? 'Đang tìm...' : 'Gợi ý Marketing'}
+                  </button>
               </div>
-              <button onClick={handleGenerate} disabled={isLoading || isLimitReached} className="w-full flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md transition-all duration-300 disabled:bg-gray-500 disabled:cursor-not-allowed">
+              <textarea id="prompt-textarea" placeholder="VD: tóc vàng, mắt xanh, đeo kính..." value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none"></textarea>
+              
+              {isSuggesting && (
+                  <div className="text-center text-sm text-gray-400">Đang lấy gợi ý từ chuyên gia marketing AI...</div>
+              )}
+
+              {suggestionError && (
+                  <p className="text-red-400 text-xs text-center">{suggestionError}</p>
+              )}
+
+              {suggestions.length > 0 && (
+                  <div className="space-y-4 max-h-60 overflow-y-auto pr-2">
+                      {suggestions.map((category) => (
+                          <div key={category.name}>
+                              <h4 className="text-sm font-semibold text-cyan-400 mb-2">{category.name}</h4>
+                              <div className="flex flex-wrap gap-2">
+                                  {category.suggestions.map((s, i) => (
+                                      <button 
+                                          key={i} 
+                                          onClick={() => handleSuggestionClick(s)}
+                                          className="px-3 py-1 bg-gray-600 hover:bg-cyan-700 text-white text-xs rounded-full transition-colors text-left"
+                                          title="Thêm gợi ý này"
+                                      >
+                                          {s}
+                                      </button>
+                                  ))}
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              )}
+
+              <button onClick={handleGenerate} disabled={isLoading} className="w-full flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md transition-all duration-300 disabled:bg-gray-500 disabled:cursor-not-allowed">
                 {isLoading ? (
                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>

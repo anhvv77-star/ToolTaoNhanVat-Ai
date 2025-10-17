@@ -5,10 +5,13 @@ import CharacterCreator from './components/CharacterCreator';
 import SceneGenerator from './components/SceneGenerator';
 import ResultViewer from './components/ResultViewer';
 import ConfirmationModal from './components/ConfirmationModal';
+import SceneConfirmationModal from './components/SceneConfirmationModal';
 import ApiKeyModal from './components/ApiKeyModal';
+import SettingsModal from './components/SettingsModal';
 import { ASPECT_RATIOS } from './constants';
 import { generateSceneWithCharacter } from './services/geminiService';
 import { base64ToImageData } from './utils/fileUtils';
+import { AlertTriangleIcon, XIcon } from './components/icons';
 
 const API_KEY_STORAGE_KEY = 'gemini-api-key';
 
@@ -29,6 +32,13 @@ const App: React.FC = () => {
 
   // State for delete confirmation
   const [characterToDelete, setCharacterToDelete] = useState<Character | null>(null);
+  const [sceneToDelete, setSceneToDelete] = useState<Scene | null>(null);
+  
+  // State for storage error
+  const [storageError, setStorageError] = useState<string | null>(null);
+
+  // State for settings modal
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   
   // --- API Key Persistence ---
   useEffect(() => {
@@ -60,19 +70,42 @@ const App: React.FC = () => {
   useEffect(() => {
     try {
       localStorage.setItem('ai-characters', JSON.stringify(characters));
-    } catch (error) {
+      if (storageError) setStorageError(null);
+    } catch (error: any) {
       console.error("Failed to save characters to localStorage", error);
+      if (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+          setStorageError("Dung lượng lưu trữ cục bộ đã đầy. Không thể lưu các thay đổi mới. Vui lòng xóa bớt nhân vật hoặc cảnh cũ để giải phóng dung lượng.");
+      }
     }
   }, [characters]);
 
   useEffect(() => {
     try {
       localStorage.setItem('ai-saved-scenes', JSON.stringify(savedScenes));
-    } catch (error) {
+      if (storageError) setStorageError(null);
+    } catch (error: any) {
       console.error("Failed to save scenes to localStorage", error);
+      if (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+          setStorageError("Dung lượng lưu trữ cục bộ đã đầy. Không thể lưu các thay đổi mới. Vui lòng xóa bớt nhân vật hoặc cảnh cũ để giải phóng dung lượng.");
+      }
     }
   }, [savedScenes]);
   // --- End Data Persistence ---
+  
+  const handleClearAllData = useCallback(() => {
+    try {
+      localStorage.removeItem('ai-characters');
+      localStorage.removeItem('ai-saved-scenes');
+      setCharacters([]);
+      setSavedScenes([]);
+      setSelectedCharacterIds([]);
+      setStorageError(null); // Clear the error message
+      setIsSettingsModalOpen(false);
+    } catch (error) {
+      console.error("Failed to clear local storage", error);
+      setStorageError("Không thể xóa dữ liệu. Vui lòng thử xóa thủ công bộ nhớ cache của trình duyệt.");
+    }
+  }, []);
 
   const handleSaveCharacter = useCallback((character: Character) => {
     setCharacters(prev => [...prev, character]);
@@ -160,7 +193,21 @@ const App: React.FC = () => {
   }, [generatedImage, scenePrompt, selectedCharacterIds]);
 
   const handleDeleteScene = useCallback((id: string) => {
-    setSavedScenes(prev => prev.filter(s => s.id !== id));
+    const scene = savedScenes.find(s => s.id === id);
+    if (scene) {
+      setSceneToDelete(scene);
+    }
+  }, [savedScenes]);
+
+  const handleConfirmDeleteScene = useCallback(() => {
+    if (sceneToDelete) {
+      setSavedScenes(prev => prev.filter(s => s.id !== sceneToDelete.id));
+      setSceneToDelete(null);
+    }
+  }, [sceneToDelete]);
+
+  const handleCancelDeleteScene = useCallback(() => {
+    setSceneToDelete(null);
   }, []);
   
   const handleNewCreation = () => {
@@ -192,6 +239,7 @@ const App: React.FC = () => {
         }
         return (
           <SceneGenerator 
+            apiKey={apiKey!}
             characters={selectedCharacters} 
             prompt={scenePrompt}
             onPromptChange={setScenePrompt}
@@ -224,6 +272,7 @@ const App: React.FC = () => {
             }}
             onDeleteCharacter={handleDeleteCharacter}
             onDeleteScene={handleDeleteScene}
+            onOpenSettings={() => setIsSettingsModalOpen(true)}
           />
         );
     }
@@ -235,12 +284,42 @@ const App: React.FC = () => {
 
   return (
     <main className="min-h-screen bg-gray-900 text-gray-100">
+      {storageError && (
+        <div className="bg-yellow-500/20 border-l-4 border-yellow-500 text-yellow-300 p-4 sticky top-0 z-50 flex justify-between items-center" role="alert">
+          <div className="flex items-center">
+            <AlertTriangleIcon className="h-6 w-6 mr-3"/>
+            <div>
+              <p className="font-bold">Lỗi Lưu Trữ</p>
+              <p className="text-sm">{storageError}</p>
+            </div>
+          </div>
+          <button onClick={() => setStorageError(null)} className="p-1 rounded-md hover:bg-yellow-500/30">
+            <XIcon className="h-5 w-5"/>
+          </button>
+        </div>
+      )}
       {renderView()}
       {characterToDelete && (
         <ConfirmationModal
           character={characterToDelete}
           onConfirm={handleConfirmDelete}
           onCancel={handleCancelDelete}
+        />
+      )}
+      {sceneToDelete && (
+        <SceneConfirmationModal
+          scene={sceneToDelete}
+          onConfirm={handleConfirmDeleteScene}
+          onCancel={handleCancelDeleteScene}
+        />
+      )}
+      {isSettingsModalOpen && (
+        <SettingsModal
+          isOpen={isSettingsModalOpen}
+          onClose={() => setIsSettingsModalOpen(false)}
+          onClearData={handleClearAllData}
+          characterCount={characters.length}
+          sceneCount={savedScenes.length}
         />
       )}
     </main>

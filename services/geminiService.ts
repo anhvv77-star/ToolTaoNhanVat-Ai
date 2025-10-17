@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality, GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI, Modality, GenerateContentResponse, Type } from "@google/genai";
 
 const processImageResponse = (response: GenerateContentResponse): string => {
   // Case 1: Prompt was blocked upfront.
@@ -16,6 +16,9 @@ const processImageResponse = (response: GenerateContentResponse): string => {
 
   // Case 3: A candidate was returned, but the generation was stopped for a reason other than success.
   if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+     if (candidate.finishReason === 'NO_IMAGE') {
+        throw new Error("AI không thể tạo hình ảnh từ mô tả của bạn. Điều này có thể do bộ lọc an toàn hoặc mô tả không đủ chi tiết. Vui lòng thử một prompt khác, cụ thể hơn.");
+    }
      throw new Error(`Quá trình tạo ảnh đã bị dừng vì lý do: ${candidate.finishReason}. Vui lòng thử một prompt khác.`);
   }
 
@@ -35,8 +38,9 @@ const handleApiError = (error: any): never => {
   if (error?.message?.includes('API key not valid')) {
     throw new Error("API Key không hợp lệ. Vui lòng kiểm tra lại.");
   }
-  if (error?.message?.includes('RESOURCE_EXHAUSTED')) {
-    throw new Error("Đã hết hạn ngạch hoặc bạn chưa bật thanh toán cho dự án Google Cloud của mình. Vui lòng kiểm tra lại.");
+  const errorMessage = error?.message?.toLowerCase() || '';
+  if (errorMessage.includes('resource_exhausted') || errorMessage.includes('quota') || errorMessage.includes('429')) {
+    throw new Error("Đã vượt quá hạn ngạch API. Vui lòng kiểm tra gói dịch vụ và thông tin thanh toán của bạn, hoặc thử lại sau.");
   }
   if (error?.message) {
     throw new Error(error.message);
@@ -113,5 +117,71 @@ export const generateSceneWithCharacter = async (
   } catch (error: any)
 {
     handleApiError(error);
+  }
+};
+
+const MARKETING_EXPERT_PROMPT = `
+Bạn là một chuyên gia marketing và sáng tạo nội dung quảng cáo có 10 năm kinh nghiệm, am hiểu sâu sắc về mô hình AIDA (Attention, Interest, Desire, Action).
+Nhiệm vụ của bạn là tạo ra các ý tưởng (prompt) để sinh ra hình ảnh quảng cáo cho các sản phẩm và dịch vụ sau đây của một công ty công nghệ Việt Nam:
+
+1.  **Nền tảng giáo dục VnnEdu.com:** Dành cho học sinh, giáo viên.
+2.  **Nền tảng quản lý doanh nghiệp (VDUP và iCavat):** Gồm ERP, CRM, HRM, Quản lý dự án. Hướng đến các CEO, quản lý, trưởng nhóm.
+3.  **Nền tảng quản lý nhà hàng (Cup69.com):** Dành cho chủ nhà hàng, quán ăn, quán cafe.
+4.  **Các dịch vụ tại nhà:** Giúp việc, Chăm sóc người già/người bệnh, Vệ sinh máy lạnh. Hướng đến các gia đình, người bận rộn.
+
+Hãy tạo ra 3-4 gợi ý cho mỗi danh mục sản phẩm/dịch vụ trên. Các gợi ý phải bằng tiếng Việt, ngắn gọn, giàu hình ảnh, và thể hiện được ít nhất một trong các giai đoạn của AIDA. Tập trung vào việc thể hiện lợi ích, kết quả, và cảm xúc tích cực mà sản phẩm mang lại.
+`;
+
+export const getSuggestions = async (apiKey: string, contextPrompt: string): Promise<any> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    const model = 'gemini-2.5-flash';
+
+    const fullPrompt = MARKETING_EXPERT_PROMPT + '\n' + contextPrompt;
+
+    const response = await ai.models.generateContent({
+      model: model,
+      contents: fullPrompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            categories: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  suggestions: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING }
+                  }
+                }
+              }
+            }
+          }
+        },
+      },
+    });
+
+    if (!response.text) {
+        throw new Error("AI không trả về gợi ý. Vui lòng thử lại.");
+    }
+    
+    const jsonResponse = JSON.parse(response.text);
+
+    if (!jsonResponse.categories || !Array.isArray(jsonResponse.categories)) {
+      throw new Error("Phản hồi gợi ý có cấu trúc không hợp lệ.");
+    }
+
+    return jsonResponse.categories;
+
+  } catch (error: any) {
+    console.error("Lỗi khi lấy gợi ý:", error);
+    if (error?.message?.includes('API key not valid')) {
+      throw new Error("API Key không hợp lệ. Vui lòng kiểm tra lại.");
+    }
+    throw new Error("Không thể lấy gợi ý từ AI. Vui lòng thử lại sau.");
   }
 };

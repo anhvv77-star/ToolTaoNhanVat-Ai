@@ -1,4 +1,3 @@
-
 export interface Character {
   id: string;
   name: string;
@@ -23,3 +22,8 @@ export interface AspectRatio {
 }
 
 export type AppView = 'library' | 'createCharacter' | 'createScene' | 'results';
+
+export interface SuggestionCategory {
+  name: string;
+  suggestions: string[];
+}

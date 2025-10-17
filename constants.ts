@@ -1,4 +1,3 @@
-
 import type { AspectRatio } from './types';
 
 export const ASPECT_RATIOS: AspectRatio[] = [
@@ -10,6 +9,3 @@ export const ASPECT_RATIOS: AspectRatio[] = [
   { label: 'TikTok (9:16)', value: '9:16' },
   { label: 'Facebook (1:1)', value: '1:1' },
 ];
-
-export const GENERATION_LIMIT = 50;
-export const SESSION_STORAGE_GENERATION_COUNT_KEY = 'ai-character-generation-count';

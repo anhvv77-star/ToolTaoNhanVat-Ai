@@ -1,7 +1,8 @@
 
+
 import React from 'react';
 import type { Character, Scene } from '../types';
-import { PlusCircleIcon, UsersIcon, CheckCircleIcon, DownloadIcon, TrashIcon } from './icons';
+import { PlusCircleIcon, UsersIcon, CheckCircleIcon, DownloadIcon, TrashIcon, SettingsIcon } from './icons';
 
 interface CharacterLibraryProps {
   characters: Character[];
@@ -12,6 +13,7 @@ interface CharacterLibraryProps {
   onGenerateScene: () => void;
   onDeleteCharacter: (id: string) => void;
   onDeleteScene: (id: string) => void;
+  onOpenSettings: () => void;
 }
 
 const CharacterLibrary: React.FC<CharacterLibraryProps> = ({ 
@@ -22,7 +24,8 @@ const CharacterLibrary: React.FC<CharacterLibraryProps> = ({
   onCreateCharacter, 
   onGenerateScene, 
   onDeleteCharacter,
-  onDeleteScene
+  onDeleteScene,
+  onOpenSettings
 }) => {
   const handleDownloadCharacter = (e: React.MouseEvent, char: Character) => {
     e.stopPropagation(); // Ngăn chặn sự kiện click của thẻ cha (chọn nhân vật)
@@ -38,13 +41,39 @@ const CharacterLibrary: React.FC<CharacterLibraryProps> = ({
     e.stopPropagation(); // Prevent selecting the character
     onDeleteCharacter(charId);
   };
+  
+  const handleDownloadScene = (e: React.MouseEvent, scene: Scene) => {
+    e.stopPropagation();
+    const link = document.createElement('a');
+    link.href = scene.imageUrl;
+    const fileName = scene.prompt ? `${scene.prompt.substring(0, 30).replace(/\s+/g, '_')}.png` : `scene-${scene.id}.png`;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  
+  const handleDeleteSceneClick = (e: React.MouseEvent, sceneId: string) => {
+    e.stopPropagation();
+    onDeleteScene(sceneId);
+  };
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
-        <div>
-          <h1 className="text-4xl font-bold text-white">Thư Viện</h1>
-          <p className="text-gray-400 mt-1">Quản lý nhân vật và các bối cảnh đã lưu của bạn.</p>
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-4xl font-bold text-white">Thư Viện</h1>
+            <p className="text-gray-400 mt-1">Quản lý nhân vật và các bối cảnh đã lưu của bạn.</p>
+          </div>
+           <button 
+            onClick={onOpenSettings}
+            className="p-2 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white transition-colors"
+            aria-label="Mở cài đặt"
+            title="Cài đặt & Quản lý Dữ liệu"
+          >
+            <SettingsIcon className="w-6 h-6"/>
+          </button>
         </div>
         <button 
           onClick={onGenerateScene} 
@@ -120,9 +149,17 @@ const CharacterLibrary: React.FC<CharacterLibraryProps> = ({
                 key={scene.id} 
                 className="relative group rounded-lg overflow-hidden transition-all duration-300 transform hover:-translate-y-1"
               >
-                  <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute top-2 right-2 z-10 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                      onClick={() => onDeleteScene(scene.id)}
+                      onClick={(e) => handleDownloadScene(e, scene)}
+                      className="p-1.5 bg-black/50 rounded-full text-white hover:bg-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      aria-label="Tải xuống cảnh"
+                      title="Tải xuống cảnh"
+                    >
+                      <DownloadIcon className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={(e) => handleDeleteSceneClick(e, scene.id)}
                       className="p-1.5 bg-black/50 rounded-full text-white hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
                       aria-label="Xóa cảnh"
                       title="Xóa cảnh"
