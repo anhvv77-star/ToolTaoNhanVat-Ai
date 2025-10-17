@@ -8,7 +8,6 @@ declare global {
 }
 
 const CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID || '';
-const API_KEY = 'YOUR_GOOGLE_API_KEY_FOR_GAPI'; // Note: This is different from Gemini Key
 const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const DATA_FILE_NAME = 'ai-character-data.json';
@@ -69,6 +68,10 @@ const waitForGlobal = <T>(name: string, timeout = 10000): Promise<T> => {
 
 const initializeGoogleApis = async (): Promise<void> => {
     if (gapiInited && gisInited) return;
+
+    if (!CLIENT_ID) {
+        throw new Error("VITE_GOOGLE_CLIENT_ID is not configured. Please add it to your environment file.");
+    }
 
     try {
         const gapi = await waitForGlobal<any>('gapi');
@@ -210,29 +213,37 @@ export const storageService = {
 
     signIn: (): Promise<any> => {
         return new Promise((resolve, reject) => {
-            if (!tokenClient) {
-                return reject("Google Auth not initialized.");
-            }
-            tokenClient.callback = (resp: any) => {
-                 if (resp.error !== undefined) {
-                    return reject(resp);
+            storageService.initGoogleApis().then(() => {
+                if (!tokenClient) {
+                   return reject(new Error("Google Auth client could not be initialized. Check console for details."));
                 }
-                resolve(resp);
-            };
-            tokenClient.requestAccessToken({ prompt: '' });
+                tokenClient.callback = (resp: any) => {
+                     if (resp.error !== undefined) {
+                        return reject(resp);
+                    }
+                    resolve(resp);
+                };
+                tokenClient.requestAccessToken({ prompt: '' });
+            }).catch(err => {
+                console.error("Sign-in failed due to initialization error:", err);
+                reject(err);
+            });
         });
     },
 
     signOut: (): void => {
-        const token = window.gapi.client.getToken();
-        if (token !== null) {
-            window.google.accounts.oauth2.revoke(token.access_token, () => {});
-            window.gapi.client.setToken(null);
+        if (gapiInited && gisInited && window.gapi?.client && window.google?.accounts) {
+            const token = window.gapi.client.getToken();
+            if (token !== null) {
+                window.google.accounts.oauth2.revoke(token.access_token, () => {});
+                window.gapi.client.setToken(null);
+            }
         }
     },
     
     loadData: async (mode: 'local' | 'drive'): Promise<AppData> => {
         if (mode === 'drive') {
+            await storageService.initGoogleApis();
             return await getDriveData();
         }
         return getLocalData();
@@ -240,6 +251,7 @@ export const storageService = {
 
     saveData: async (mode: 'local' | 'drive', data: AppData): Promise<void> => {
         if (mode === 'drive') {
+            await storageService.initGoogleApis();
             await saveDriveData(data);
         } else {
             saveLocalData(data);
@@ -248,6 +260,7 @@ export const storageService = {
 
     clearData: async (mode: 'local' | 'drive'): Promise<void> => {
         if (mode === 'drive') {
+            await storageService.initGoogleApis();
             await clearDriveData();
         } else {
             clearLocalData();

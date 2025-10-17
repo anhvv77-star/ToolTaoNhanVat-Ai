@@ -138,7 +138,7 @@ const App: React.FC = () => {
             setStorageError(`Không thể lưu dữ liệu vào ${storageMode === 'drive' ? 'Google Drive' : 'thiết bị'}.`);
         }
     }
-  }, [characters, savedScenes, storageMode, storageError, isDataLoading]);
+  }, [characters, savedScenes, storageMode, isDataLoading]);
 
   // Auto-save whenever data changes
   useEffect(() => {
