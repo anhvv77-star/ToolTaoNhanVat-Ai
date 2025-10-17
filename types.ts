@@ -21,6 +21,11 @@ export interface AspectRatio {
   value: string;
 }
 
+export interface PhoneBrandRatios {
+  brand: string;
+  models: AspectRatio[];
+}
+
 export type AppView = 'library' | 'createCharacter' | 'createScene' | 'results';
 
 export interface SuggestionCategory {

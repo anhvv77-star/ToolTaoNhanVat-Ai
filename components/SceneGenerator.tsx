@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import type { Character, AspectRatio, SuggestionCategory } from '../types';
-import { ASPECT_RATIOS } from '../constants';
+import type { Character, AspectRatio, SuggestionCategory, PhoneBrandRatios } from '../types';
+import { STANDARD_ASPECT_RATIOS, PHONE_WALLPAPER_ASPECT_RATIOS } from '../constants';
 import { getSuggestions } from '../services/geminiService';
 import { WandSparklesIcon, ChevronLeftIcon, LightbulbIcon } from './icons';
 
@@ -33,6 +33,9 @@ const SceneGenerator: React.FC<SceneGeneratorProps> = ({
   const [suggestions, setSuggestions] = useState<SuggestionCategory[]>([]);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
 
+  const [ratioCategory, setRatioCategory] = useState<'standard' | 'phone'>('standard');
+  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
+
   const handleGetSuggestions = async () => {
       setIsSuggesting(true);
       setSuggestionError(null);
@@ -52,6 +55,10 @@ const SceneGenerator: React.FC<SceneGeneratorProps> = ({
   const handleSuggestionClick = (suggestion: string) => {
       onPromptChange(prompt ? `${prompt}. ${suggestion}` : suggestion);
   };
+
+  const selectedBrandModels = selectedBrand
+    ? PHONE_WALLPAPER_ASPECT_RATIOS.find(b => b.brand === selectedBrand)?.models
+    : [];
 
   return (
      <div className="max-w-6xl mx-auto p-4 sm:p-6 md:p-8">
@@ -130,17 +137,71 @@ const SceneGenerator: React.FC<SceneGeneratorProps> = ({
           )}
           
           <h2 className="text-xl font-semibold mt-6 mb-4 text-cyan-400">2. Chọn tỷ lệ khung hình</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {ASPECT_RATIOS.map((ratio) => (
-              <button 
-                key={ratio.label}
-                onClick={() => onAspectRatioChange(ratio)}
-                className={`p-3 border-2 rounded-md text-sm font-medium transition-colors ${aspectRatio.label === ratio.label ? 'bg-cyan-600 border-cyan-500 text-white' : 'bg-gray-700 border-gray-600 hover:border-cyan-600'}`}
-              >
-                {ratio.label}
-              </button>
-            ))}
+          <div className="flex border border-gray-600 rounded-lg p-1 bg-gray-700 mb-4">
+            <button
+              onClick={() => setRatioCategory('standard')}
+              className={`w-1/2 py-2 rounded-md text-sm font-medium transition-colors ${ratioCategory === 'standard' ? 'bg-cyan-600 text-white' : 'text-gray-300 hover:bg-gray-600'}`}
+            >
+              Tỷ lệ chuẩn
+            </button>
+            <button
+              onClick={() => { setRatioCategory('phone'); setSelectedBrand(null); }}
+              className={`w-1/2 py-2 rounded-md text-sm font-medium transition-colors ${ratioCategory === 'phone' ? 'bg-cyan-600 text-white' : 'text-gray-300 hover:bg-gray-600'}`}
+            >
+              Hình nền điện thoại
+            </button>
           </div>
+
+          {ratioCategory === 'standard' && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {STANDARD_ASPECT_RATIOS.map((ratio) => (
+                <button 
+                  key={ratio.label}
+                  onClick={() => onAspectRatioChange(ratio)}
+                  className={`p-3 border-2 rounded-md text-sm font-medium transition-colors ${aspectRatio.value === ratio.value && aspectRatio.label === ratio.label ? 'bg-cyan-600 border-cyan-500 text-white' : 'bg-gray-700 border-gray-600 hover:border-cyan-600'}`}
+                >
+                  {ratio.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {ratioCategory === 'phone' && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm font-medium text-gray-300 mb-2">Chọn hãng điện thoại:</p>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                  {PHONE_WALLPAPER_ASPECT_RATIOS.map((brandInfo) => (
+                    <button
+                      key={brandInfo.brand}
+                      onClick={() => setSelectedBrand(brandInfo.brand)}
+                      className={`p-2 border-2 rounded-md text-xs font-semibold transition-colors ${selectedBrand === brandInfo.brand ? 'bg-cyan-600 border-cyan-500 text-white' : 'bg-gray-700 border-gray-600 hover:border-cyan-600'}`}
+                    >
+                      {brandInfo.brand}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {selectedBrand && selectedBrandModels && (
+                <div className="border-t border-gray-700 pt-4">
+                   <p className="text-sm font-medium text-gray-300 mb-2">Chọn model cho {selectedBrand}:</p>
+                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {selectedBrandModels.map((ratio) => (
+                        <button
+                          key={ratio.label}
+                          onClick={() => onAspectRatioChange(ratio)}
+                          className={`p-3 border-2 rounded-md text-sm font-medium transition-colors ${aspectRatio.value === ratio.value && aspectRatio.label === ratio.label ? 'bg-cyan-600 border-cyan-500 text-white' : 'bg-gray-700 border-gray-600 hover:border-cyan-600'}`}
+                        >
+                           {ratio.label}
+                        </button>
+                      ))}
+                   </div>
+                </div>
+              )}
+            </div>
+          )}
+
 
           {error && <p className="text-red-400 mt-4 text-sm">{error}</p>}
           

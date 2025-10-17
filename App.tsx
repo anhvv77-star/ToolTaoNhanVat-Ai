@@ -9,7 +9,8 @@ import SceneConfirmationModal from './components/SceneConfirmationModal';
 import ApiKeyModal from './components/ApiKeyModal';
 import SettingsModal from './components/SettingsModal';
 import StorageSelectionModal from './components/StorageSelectionModal';
-import { ASPECT_RATIOS } from './constants';
+// FIX: Changed ASPECT_RATIOS to STANDARD_ASPECT_RATIOS to match the export from constants.ts.
+import { STANDARD_ASPECT_RATIOS } from './constants';
 import { generateSceneWithCharacter } from './services/geminiService';
 import { storageService } from './services/storageService';
 import { base64ToImageData } from './utils/fileUtils';
@@ -28,7 +29,8 @@ const App: React.FC = () => {
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
 
   const [scenePrompt, setScenePrompt] = useState('');
-  const [sceneAspectRatio, setSceneAspectRatio] = useState<AspectRatio>(ASPECT_RATIOS[0]);
+  // FIX: Changed ASPECT_RATIOS to STANDARD_ASPECT_RATIOS to match the import change.
+  const [sceneAspectRatio, setSceneAspectRatio] = useState<AspectRatio>(STANDARD_ASPECT_RATIOS[0]);
   const [isLoading, setIsLoading] = useState(false);
   const [sceneError, setSceneError] = useState<string | null>(null);
 
@@ -280,7 +282,8 @@ const App: React.FC = () => {
     setSelectedCharacterIds([]);
     setGeneratedImage(null);
     setScenePrompt('');
-    setSceneAspectRatio(ASPECT_RATIOS[0]);
+    // FIX: Changed ASPECT_RATIOS to STANDARD_ASPECT_RATIOS to match the import change.
+    setSceneAspectRatio(STANDARD_ASPECT_RATIOS[0]);
     setSceneError(null);
     setView('library');
   };
