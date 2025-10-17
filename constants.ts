@@ -1,5 +1,13 @@
 import type { AspectRatio, PhoneBrandRatios } from './types';
 
+export const PRODUCT_SERVICES: string[] = [
+  'Nền tảng giáo dục VnnEdu.com',
+  'Nền tảng quản lý doanh nghiệp (VDUP và iCavat)',
+  'Nền tảng quản lý nhà hàng (Cup69.com)',
+  'Các dịch vụ tại nhà (Giúp việc, Chăm sóc người già, Vệ sinh)',
+  'Tất cả sản phẩm/dịch vụ'
+];
+
 export const STANDARD_ASPECT_RATIOS: AspectRatio[] = [
   { label: 'Dọc (9:16)', value: '9:16' },
   { label: 'Ngang (16:9)', value: '16:9' },

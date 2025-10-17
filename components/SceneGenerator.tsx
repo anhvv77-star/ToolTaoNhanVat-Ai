@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { Character, AspectRatio, SuggestionCategory, PhoneBrandRatios } from '../types';
-import { STANDARD_ASPECT_RATIOS, PHONE_WALLPAPER_ASPECT_RATIOS } from '../constants';
+import { STANDARD_ASPECT_RATIOS, PHONE_WALLPAPER_ASPECT_RATIOS, PRODUCT_SERVICES } from '../constants';
 import { getSuggestions } from '../services/geminiService';
 import { WandSparklesIcon, ChevronLeftIcon, LightbulbIcon } from './icons';
 
@@ -32,18 +32,20 @@ const SceneGenerator: React.FC<SceneGeneratorProps> = ({
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [suggestions, setSuggestions] = useState<SuggestionCategory[]>([]);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<string>('');
 
   const [ratioCategory, setRatioCategory] = useState<'standard' | 'phone'>('standard');
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
 
   const handleGetSuggestions = async () => {
+      if (!selectedProduct) return;
       setIsSuggesting(true);
       setSuggestionError(null);
       setSuggestions([]);
       try {
         const characterDescriptions = characters.map(c => c.name).join(' và ');
         const userPrompt = `Yêu cầu: Dựa trên (các) nhân vật '${characterDescriptions}', hãy tạo các gợi ý mô tả 'bối cảnh' quảng cáo. Chỉ trả về một đối tượng JSON có khóa 'categories' chứa một mảng các đối tượng, mỗi đối tượng có khóa 'name' (tên danh mục) và 'suggestions' (mảng các chuỗi gợi ý).`;
-        const result = await getSuggestions(apiKey, userPrompt);
+        const result = await getSuggestions(apiKey, userPrompt, selectedProduct);
         setSuggestions(result);
       } catch (err: any) {
         setSuggestionError(err.message || 'Không thể lấy gợi ý.');
@@ -87,17 +89,31 @@ const SceneGenerator: React.FC<SceneGeneratorProps> = ({
 
         {/* Right Panel: Scene Details */}
         <div className="md:col-span-2 bg-gray-800 p-6 rounded-lg shadow-lg">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold mb-4 text-cyan-400">1. Mô tả bối cảnh</h2>
-            <button 
-              onClick={handleGetSuggestions} 
-              disabled={isSuggesting}
-              className="flex items-center mb-4 text-sm text-cyan-400 hover:text-cyan-300 disabled:text-gray-500 disabled:cursor-wait"
-            >
-              <LightbulbIcon className="w-4 h-4 mr-1" />
-              {isSuggesting ? 'Đang tìm...' : 'Gợi ý Marketing'}
-            </button>
+          <h2 className="text-xl font-semibold mb-4 text-cyan-400">1. Mô tả bối cảnh</h2>
+          
+          <div className="bg-gray-700/50 p-3 rounded-md mb-4">
+              <label htmlFor="product-select-scene" className="text-sm font-medium text-cyan-400 block mb-2">Chọn sản phẩm để nhận gợi ý bối cảnh:</label>
+              <div className="flex items-center gap-2">
+                  <select 
+                      id="product-select-scene"
+                      value={selectedProduct} 
+                      onChange={(e) => setSelectedProduct(e.target.value)}
+                      className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-white text-sm focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+                  >
+                      <option value="">-- Chọn một tùy chọn --</option>
+                      {PRODUCT_SERVICES.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                  <button 
+                      onClick={handleGetSuggestions} 
+                      disabled={isSuggesting || !selectedProduct}
+                      className="flex-shrink-0 flex items-center text-sm text-white bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-500 disabled:cursor-not-allowed px-4 py-2 rounded-md font-semibold"
+                  >
+                      <LightbulbIcon className="w-4 h-4 mr-1.5" />
+                      <span>{isSuggesting ? 'Đang tải...' : 'Gợi ý'}</span>
+                  </button>
+              </div>
           </div>
+
           <textarea 
             placeholder='Ví dụ: "đang ngồi trong một quán cà phê ấm cúng vào ban đêm", "đứng trên đỉnh núi tuyết", "studio chụp ảnh thời trang với ánh đèn neon"...'
             value={prompt}

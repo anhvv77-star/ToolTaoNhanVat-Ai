@@ -120,24 +120,39 @@ export const generateSceneWithCharacter = async (
   }
 };
 
-const MARKETING_EXPERT_PROMPT = `
+const MARKETING_EXPERT_PROMPT_BASE = `
 Bạn là một chuyên gia marketing và sáng tạo nội dung quảng cáo có 10 năm kinh nghiệm, am hiểu sâu sắc về mô hình AIDA (Attention, Interest, Desire, Action).
-Nhiệm vụ của bạn là tạo ra các ý tưởng (prompt) để sinh ra hình ảnh quảng cáo cho các sản phẩm và dịch vụ sau đây của một công ty công nghệ Việt Nam:
+Nhiệm vụ của bạn là tạo ra các ý tưởng (prompt) để sinh ra hình ảnh quảng cáo. Các gợi ý phải bằng tiếng Việt, ngắn gọn, giàu hình ảnh, và thể hiện được ít nhất một trong các giai đoạn của AIDA. Tập trung vào việc thể hiện lợi ích, kết quả, và cảm xúc tích cực mà sản phẩm mang lại.
+`;
+
+const ALL_PRODUCTS_DETAILS = `
+Tập trung vào các sản phẩm và dịch vụ sau đây của một công ty công nghệ Việt Nam:
 
 1.  **Nền tảng giáo dục VnnEdu.com:** Dành cho học sinh, giáo viên.
 2.  **Nền tảng quản lý doanh nghiệp (VDUP và iCavat):** Gồm ERP, CRM, HRM, Quản lý dự án. Hướng đến các CEO, quản lý, trưởng nhóm.
 3.  **Nền tảng quản lý nhà hàng (Cup69.com):** Dành cho chủ nhà hàng, quán ăn, quán cafe.
 4.  **Các dịch vụ tại nhà:** Giúp việc, Chăm sóc người già/người bệnh, Vệ sinh máy lạnh. Hướng đến các gia đình, người bận rộn.
 
-Hãy tạo ra 3-4 gợi ý cho mỗi danh mục sản phẩm/dịch vụ trên. Các gợi ý phải bằng tiếng Việt, ngắn gọn, giàu hình ảnh, và thể hiện được ít nhất một trong các giai đoạn của AIDA. Tập trung vào việc thể hiện lợi ích, kết quả, và cảm xúc tích cực mà sản phẩm mang lại.
+Hãy tạo ra 3-4 gợi ý cho mỗi danh mục sản phẩm/dịch vụ trên.
 `;
 
-export const getSuggestions = async (apiKey: string, contextPrompt: string): Promise<any> => {
+const getSingleProductDetails = (product: string) => `
+Tập trung vào sản phẩm/dịch vụ cụ thể sau: **"${product}"**. Hãy tạo ra 4-5 gợi ý chỉ cho sản phẩm/dịch vụ này.`;
+
+
+export const getSuggestions = async (apiKey: string, contextPrompt: string, selectedProduct?: string): Promise<any> => {
   try {
     const ai = new GoogleGenAI({ apiKey });
     const model = 'gemini-2.5-flash';
 
-    const fullPrompt = MARKETING_EXPERT_PROMPT + '\n' + contextPrompt;
+    let marketingPrompt;
+    if (selectedProduct && selectedProduct !== 'Tất cả sản phẩm/dịch vụ') {
+        marketingPrompt = MARKETING_EXPERT_PROMPT_BASE + getSingleProductDetails(selectedProduct);
+    } else {
+        marketingPrompt = MARKETING_EXPERT_PROMPT_BASE + ALL_PRODUCTS_DETAILS;
+    }
+
+    const fullPrompt = marketingPrompt + '\n' + contextPrompt;
 
     const response = await ai.models.generateContent({
       model: model,

@@ -3,6 +3,7 @@ import type { Character, SuggestionCategory } from '../types';
 import { fileToBase64 } from '../utils/fileUtils';
 import { getSuggestions, generateImageFromPrompt } from '../services/geminiService';
 import { UploadCloudIcon, WandSparklesIcon, ChevronLeftIcon, LightbulbIcon } from './icons';
+import { PRODUCT_SERVICES } from '../constants';
 
 interface CharacterCreatorProps {
   onSave: (character: Character) => void;
@@ -31,6 +32,7 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel, a
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [suggestions, setSuggestions] = useState<SuggestionCategory[]>([]);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<string>('');
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -71,12 +73,13 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel, a
   };
   
   const handleGetSuggestions = async () => {
+    if (!selectedProduct) return;
     setIsSuggesting(true);
     setSuggestionError(null);
     setSuggestions([]);
     try {
       const userPrompt = "Yêu cầu: Hãy tạo các gợi ý mô tả 'nhân vật' đại diện cho các sản phẩm và dịch vụ đó. Chỉ trả về một đối tượng JSON có khóa 'categories' chứa một mảng các đối tượng, mỗi đối tượng có khóa 'name' (tên danh mục) và 'suggestions' (mảng các chuỗi gợi ý).";
-      const result = await getSuggestions(apiKey, userPrompt);
+      const result = await getSuggestions(apiKey, userPrompt, selectedProduct);
       setSuggestions(result);
     } catch (err: any) {
       setSuggestionError(err.message || 'Không thể lấy gợi ý.');
@@ -158,17 +161,31 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onCancel, a
           
           {mode === 'generate' ? (
             <div className="mt-4 space-y-4">
-              <div className="flex justify-between items-center">
-                  <label htmlFor="prompt-textarea" className="text-sm font-medium text-gray-300">Mô tả thêm về nhân vật</label>
-                  <button 
-                      onClick={handleGetSuggestions} 
-                      disabled={isSuggesting}
-                      className="flex items-center text-xs text-cyan-400 hover:text-cyan-300 disabled:text-gray-500 disabled:cursor-wait"
+              <label htmlFor="prompt-textarea" className="text-sm font-medium text-gray-300">Mô tả thêm về nhân vật</label>
+              
+              <div className="bg-gray-700/50 p-3 rounded-md">
+                <label htmlFor="product-select" className="text-xs font-medium text-cyan-400 block mb-2">Chọn sản phẩm để nhận gợi ý marketing:</label>
+                <div className="flex items-center gap-2">
+                  <select 
+                    id="product-select"
+                    value={selectedProduct} 
+                    onChange={(e) => setSelectedProduct(e.target.value)}
+                    className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-white text-sm focus:ring-2 focus:ring-cyan-500 focus:outline-none"
                   >
-                      <LightbulbIcon className="w-4 h-4 mr-1" />
-                      {isSuggesting ? 'Đang tìm...' : 'Gợi ý Marketing'}
+                    <option value="">-- Chọn một tùy chọn --</option>
+                    {PRODUCT_SERVICES.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                  <button 
+                    onClick={handleGetSuggestions} 
+                    disabled={isSuggesting || !selectedProduct}
+                    className="flex-shrink-0 flex items-center text-xs text-white bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-500 disabled:cursor-not-allowed px-3 py-2 rounded-md font-semibold"
+                  >
+                    <LightbulbIcon className="w-4 h-4 mr-1.5" />
+                    <span>{isSuggesting ? 'Đang tải...' : 'Gợi ý'}</span>
                   </button>
+                </div>
               </div>
+
               <textarea id="prompt-textarea" placeholder="VD: tóc vàng, mắt xanh, đeo kính..." value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none"></textarea>
               
               {isSuggesting && (
